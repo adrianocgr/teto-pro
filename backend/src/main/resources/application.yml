@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: tetopro-obra-api
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/tetopro_obra
+    username: tetopro_obra
+    password: tetopro_obra
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: America/Sao_Paulo
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  data:
+    mongodb:
+      uri: mongodb://tetopro_obra:tetopro_obra@localhost:27017
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/realms/tetopro-obra
+
+tetopro-obra:
+  cors:
+    origens-permitidas: http://localhost:5173,http://localhost:3000
+  keycloak-admin:
+    url: http://localhost:8081
+    realm: tetopro-obra
+    client-id: tetopro-obra-backend
+    client-secret: ${TETOPRO_OBRA_KEYCLOAK_ADMIN_SECRET:tetopro-obra-backend-secret-dev}
+  mongo:
+    banco-auditoria: tetopro_obra_auditoria
+    banco-arquivos: tetopro_obra_arquivos
+  arquivos:
+    bucket: tetoproobra_arquivos
+    tamanho-maximo-bytes: 15728640 # 15MB
+    tipos-permitidos: application/pdf,image/jpeg,image/png
+
+springdoc:
+  swagger-ui:
+    path: /docs
+
+server:
+  port: 8080
+
+logging:
+  level:
+    br.com.tetoproobra: INFO

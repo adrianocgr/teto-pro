@@ -1,0 +1,116 @@
+# =========================================================
+# Stack de produção — pensado pra ser importado como app "Compose" no
+# Dokploy. O Dokploy já cuida do proxy reverso (Traefik) e do certificado
+# HTTPS (Let's Encrypt); este arquivo só sobe os containers.
+#
+# Depois de importar, configure no painel do Dokploy um domínio pra cada
+# um destes serviços (aponte o DNS de cada domínio pro servidor primeiro):
+#   tetopro-obra-web       porta 80    -> tetopro.com (e www.tetopro.com)
+#   tetopro-obra-api       porta 8080  -> api.tetopro.com
+#   tetopro-obra-keycloak  porta 8080  -> auth.tetopro.com
+#
+# tetopro-obra-postgres e tetopro-obra-mongo NÃO recebem domínio — só são
+# alcançados pela rede interna do compose, nunca pela internet.
+#
+# Variáveis de ambiente obrigatórias (configure no Dokploy, nunca commitadas
+# aqui) — ver .env.prod.example na raiz do repositório para a lista completa.
+# =========================================================
+
+services:
+  tetopro-obra-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tetopro_obra}
+      POSTGRES_USER: ${POSTGRES_USER:-tetopro_obra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+    volumes:
+      - tetopro_obra_postgres_dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tetopro_obra}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  tetopro-obra-mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-tetopro_obra}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?defina MONGO_PASSWORD}
+    volumes:
+      - tetopro_obra_mongo_dados:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  tetopro-obra-keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    restart: unless-stopped
+    # "start" (produção) — não "start-dev". KC_PROXY=edge faz o Keycloak
+    # confiar no cabeçalho X-Forwarded-Proto do Traefik/Dokploy (TLS é
+    # terminado lá, o Keycloak só enxerga HTTP na rede interna).
+    command: ["start", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?defina KEYCLOAK_ADMIN_PASSWORD}
+      KC_HOSTNAME: auth.tetopro.com
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY: edge
+    volumes:
+      - ./backend/src/main/resources/keycloak:/opt/keycloak/data/import
+      - tetopro_obra_keycloak_dados:/opt/keycloak/data
+    expose:
+      - "8080"
+
+  tetopro-obra-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      POSTGRES_DB: ${POSTGRES_DB:-tetopro_obra}
+      POSTGRES_USER: ${POSTGRES_USER:-tetopro_obra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      MONGO_USER: ${MONGO_USER:-tetopro_obra}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:?defina MONGO_PASSWORD}
+      TETOPRO_OBRA_KEYCLOAK_ADMIN_SECRET: ${TETOPRO_OBRA_KEYCLOAK_ADMIN_SECRET:?defina TETOPRO_OBRA_KEYCLOAK_ADMIN_SECRET}
+    depends_on:
+      tetopro-obra-postgres:
+        condition: service_healthy
+      tetopro-obra-mongo:
+        condition: service_healthy
+      tetopro-obra-keycloak:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    expose:
+      - "8080"
+
+  tetopro-obra-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://api.tetopro.com
+        VITE_KEYCLOAK_URL: https://auth.tetopro.com
+        VITE_KEYCLOAK_REALM: tetopro-obra
+        VITE_KEYCLOAK_CLIENT_ID: tetopro-obra-frontend
+    restart: unless-stopped
+    depends_on:
+      - tetopro-obra-api
+    expose:
+      - "80"
+
+volumes:
+  tetopro_obra_postgres_dados:
+  tetopro_obra_mongo_dados:
+  tetopro_obra_keycloak_dados:

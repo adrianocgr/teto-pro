@@ -1,0 +1,27 @@
+# Perfil ativado quando a API roda dentro do docker-compose: os
+# demais serviços (Postgres, MongoDB, Keycloak) são acessados pelo
+# nome do serviço na rede interna do compose, não por "localhost".
+#
+# O issuer-uri continua apontando para o endereço PÚBLICO do Keycloak
+# (o mesmo que o navegador/frontend usa) — é ele que aparece dentro do
+# claim "iss" do token. Já o jwk-set-uri (usado só para buscar as
+# chaves públicas de validação da assinatura) aponta para o endereço
+# interno do container, que a API consegue resolver.
+spring:
+  datasource:
+    url: jdbc:postgresql://tetopro-obra-postgres:5432/tetopro_obra
+
+  data:
+    mongodb:
+      uri: mongodb://tetopro_obra:tetopro_obra@tetopro-obra-mongo:27017
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/realms/tetopro-obra
+          jwk-set-uri: http://tetopro-obra-keycloak:8080/realms/tetopro-obra/protocol/openid-connect/certs
+
+tetopro-obra:
+  keycloak-admin:
+    url: http://tetopro-obra-keycloak:8080

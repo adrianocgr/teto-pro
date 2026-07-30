@@ -1,0 +1,144 @@
+{
+  "realm": "tetopro-obra",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "accessTokenLifespan": 1800,
+
+  "roles": {
+    "realm": [
+      { "name": "ADMIN", "description": "Acesso total: gerencia empreendimentos, investidores e usuários" },
+      { "name": "GESTOR", "description": "Lança custos e registra vendas, sem gerenciar usuários" },
+      { "name": "INVESTIDOR_VISUALIZADOR", "description": "Acesso somente leitura aos próprios empreendimentos" },
+      { "name": "PLATAFORMA_ADMIN", "description": "Administrador da plataforma — não pertence a nenhuma empresa; cadastra empresas, usuários e vincula usuários a empresas" }
+    ]
+  },
+
+  "clients": [
+    {
+      "clientId": "tetopro-obra-frontend",
+      "name": "TetoPro Obra — Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:5173/*", "http://localhost:3000/*", "https://tetopro.com/*", "https://www.tetopro.com/*"],
+      "webOrigins": ["http://localhost:5173", "http://localhost:3000", "https://tetopro.com", "https://www.tetopro.com"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "full name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-full-name-mapper",
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "tetopro-obra-backend",
+      "name": "TetoPro Obra — Backend (service account)",
+      "description": "Usado só pelo backend para provisionar/remover usuários via Admin REST API do Keycloak (ver KeycloakAdminClient). Nunca usado por navegador.",
+      "enabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "tetopro-obra-backend-secret-dev"
+    }
+  ],
+
+  "users": [
+    {
+      "username": "joao.meireles",
+      "email": "joao@andrade.com.br",
+      "firstName": "João",
+      "lastName": "Meireles",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "trocar123", "temporary": true }]
+    },
+    {
+      "username": "fernanda.prado",
+      "email": "fernanda@andrade.com.br",
+      "firstName": "Fernanda",
+      "lastName": "Prado",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "trocar123", "temporary": true }]
+    },
+    {
+      "username": "rodrigo.nunes",
+      "email": "rodrigo@rnincorp.com.br",
+      "firstName": "Rodrigo",
+      "lastName": "Nunes",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "trocar123", "temporary": true }]
+    },
+    {
+      "username": "camila.duarte",
+      "email": "camila@rnincorp.com.br",
+      "firstName": "Camila",
+      "lastName": "Duarte",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "trocar123", "temporary": true }]
+    },
+    {
+      "username": "service-account-tetopro-obra-backend",
+      "enabled": true,
+      "serviceAccountClientId": "tetopro-obra-backend",
+      "clientRoles": {
+        "realm-management": ["manage-users"]
+      }
+    },
+    {
+      "id": "fc9ed64d-0e64-499c-b2e9-acd2f1ce0e19",
+      "username": "admin.plataforma",
+      "email": "admin@tetoproobra.com.br",
+      "firstName": "Admin",
+      "lastName": "Plataforma",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "trocar123", "temporary": true }],
+      "realmRoles": ["PLATAFORMA_ADMIN"]
+    }
+  ]
+}

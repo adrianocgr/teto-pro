@@ -1,0 +1,48 @@
+# Perfil de produção (Dokploy) — hostnames internos são os nomes dos
+# serviços no docker-compose.prod.yml; credenciais/segredos vêm de variáveis
+# de ambiente configuradas no Dokploy (nunca hardcoded aqui).
+#
+# Mesma lógica de issuer-uri/jwk-set-uri do perfil "docker": issuer-uri é o
+# endereço PÚBLICO do Keycloak (precisa bater com o claim "iss" do token,
+# validado contra o que o navegador usa); jwk-set-uri aponta direto pro
+# container (rede interna), evitando um salto a mais pelo proxy só pra buscar
+# as chaves públicas de assinatura.
+spring:
+  datasource:
+    url: jdbc:postgresql://tetopro-obra-postgres:5432/${POSTGRES_DB:tetopro_obra}
+    username: ${POSTGRES_USER:tetopro_obra}
+    password: ${POSTGRES_PASSWORD}
+
+  jpa:
+    properties:
+      hibernate:
+        format_sql: false
+
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USER:tetopro_obra}:${MONGO_PASSWORD}@tetopro-obra-mongo:27017
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://auth.tetopro.com/realms/tetopro-obra
+          jwk-set-uri: http://tetopro-obra-keycloak:8080/realms/tetopro-obra/protocol/openid-connect/certs
+
+tetopro-obra:
+  cors:
+    origens-permitidas: https://tetopro.com,https://www.tetopro.com
+  keycloak-admin:
+    url: http://tetopro-obra-keycloak:8080
+
+# Documentação da API não fica pública em produção (reduz superfície exposta).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    br.com.tetoproobra: INFO
+    org.hibernate.SQL: WARN

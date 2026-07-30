@@ -1,0 +1,179 @@
+@font-face {
+  font-family: 'Plex Sans';
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('../assets/fontes/plex-sans.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Plex Mono';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('../assets/fontes/plex-mono-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Plex Mono';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('../assets/fontes/plex-mono-600.woff2') format('woff2');
+}
+
+:root {
+  color-scheme: light;
+  /* Tokens de MARCA — propositalmente fixos, não trocam com o tema. Usados
+     na barra lateral (sempre escura) e no botão primário: são a única forma
+     de garantir contraste correto nos dois temas sem depender de --ink, que
+     é a cor de TEXTO da página e precisa inverter entre claro/escuro. */
+  --marca: #142140;
+  --marca-2: #1d3057;
+  --marca-contraste: #f8f4ea;
+
+  --bg: #f6f3ec;
+  --surface: #ffffff;
+  --surface-2: #eee7d8;
+  --sidebar-bg: var(--marca);
+  --sidebar-bg-2: var(--marca-2);
+  --sidebar-ink: #f4f1e8;
+  --sidebar-ink-muted: rgba(244, 241, 232, 0.6);
+  --sidebar-active: rgba(216, 160, 62, 0.22);
+  --border: #e4dcca;
+  --border-strong: #d3c8b2;
+  --ink: #191f30;
+  --ink-2: #4b5468;
+  --ink-muted: #838da0;
+  --gold: #97672a;
+  --gold-fill: #d09b3e;
+  --orange: #a84a1c;
+  --orange-fill: #dd7638;
+  --good: #157a2e;
+  --warning: #a56600;
+  --serious: #c2582b;
+  --critical: #bd2f2f;
+  --focus: #235fae;
+  --shadow-sm: 0 1px 2px rgba(20, 33, 64, 0.07), 0 1px 1px rgba(20, 33, 64, 0.04);
+  --shadow-md: 0 8px 24px rgba(20, 33, 64, 0.16), 0 2px 6px rgba(20, 33, 64, 0.08);
+  --cat-1: #235fae;
+  --cat-2: #c05a26;
+  --cat-3: #16825e;
+  --cat-4: #b3821a;
+  --cat-5: #b0507b;
+  --cat-6: #3c7d3c;
+  --cat-7: #5b4aa8;
+  --cat-8: #b23e3e;
+}
+
+:root[data-tema='escuro'] {
+  color-scheme: dark;
+  --marca: #0c1424;
+  --marca-2: #16213c;
+  --marca-contraste: #f8f4ea;
+
+  --bg: #0b1220;
+  --surface: #141f36;
+  --surface-2: #1b2942;
+  --sidebar-bg: var(--marca);
+  --sidebar-bg-2: var(--marca-2);
+  --border: #2a3a5c;
+  --border-strong: #3c4f78;
+  --ink: #eeeade;
+  --ink-2: #c2cadc;
+  --ink-muted: #8792ab;
+  --gold: #e8bd66;
+  --gold-fill: #e8bd66;
+  --orange: #ef9257;
+  --orange-fill: #ef9257;
+  --good: #4bc27a;
+  --warning: #e0ab4b;
+  --serious: #e2915f;
+  --critical: #e57272;
+  --focus: #6ba3ef;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --cat-1: #6ba3ef;
+  --cat-2: #e17c42;
+  --cat-3: #3fb98a;
+  --cat-4: #dba33f;
+  --cat-5: #e08cae;
+  --cat-6: #6fbf6f;
+  --cat-7: #a79bef;
+  --cat-8: #ea8686;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    color-scheme: dark;
+    --marca: #0c1424;
+    --marca-2: #16213c;
+    --marca-contraste: #f8f4ea;
+
+    --bg: #0b1220;
+    --surface: #141f36;
+    --surface-2: #1b2942;
+    --sidebar-bg: var(--marca);
+    --sidebar-bg-2: var(--marca-2);
+    --border: #2a3a5c;
+    --border-strong: #3c4f78;
+    --ink: #eeeade;
+    --ink-2: #c2cadc;
+    --ink-muted: #8792ab;
+    --gold: #e8bd66;
+    --gold-fill: #e8bd66;
+    --orange: #ef9257;
+    --orange-fill: #ef9257;
+    --good: #4bc27a;
+    --warning: #e0ab4b;
+    --serious: #e2915f;
+    --critical: #e57272;
+    --focus: #6ba3ef;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.5);
+    --cat-1: #6ba3ef;
+    --cat-2: #e17c42;
+    --cat-3: #3fb98a;
+    --cat-4: #dba33f;
+    --cat-5: #e08cae;
+    --cat-6: #6fbf6f;
+    --cat-7: #a79bef;
+    --cat-8: #ea8686;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#raiz {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+body {
+  font-family: 'Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.mono {
+  font-family: 'Plex Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+a {
+  color: inherit;
+}
+::selection {
+  background: var(--gold-fill);
+  color: var(--marca);
+}
