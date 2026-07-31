@@ -1,0 +1,45 @@
+# =========================================================
+# Keycloak em produção — deploy SEPARADO do app (ciclo de vida próprio no
+# Dokploy: outra "app" Compose, apontando pra este arquivo). Usa um banco
+# Postgres dedicado no mesmo servidor externo já usado pelo tetopro_obra
+# (ver scripts/bootstrap-postgres-keycloak.sql).
+#
+# No painel do Dokploy, configure um domínio pra este serviço:
+#   tetopro-obra-keycloak   porta 8080  -> auth.tetopro.com
+#
+# O realm é importado automaticamente ("--import-realm") na primeira
+# subida, a partir do arquivo já versionado no repositório — antes de subir,
+# troque o secret do client "tetopro-obra-backend" dentro dele (hoje está
+# com o valor de desenvolvimento) por um segredo forte, e use esse MESMO
+# valor em TETOPRO_OBRA_KEYCLOAK_ADMIN_SECRET no compose do app.
+#
+# Variáveis de ambiente obrigatórias — ver .env.keycloak.example.
+# =========================================================
+
+services:
+  tetopro-obra-keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    restart: unless-stopped
+    # "start" (produção), não "start-dev". KC_PROXY=edge faz o Keycloak
+    # confiar no X-Forwarded-Proto do Traefik/Dokploy — TLS é terminado lá,
+    # o Keycloak só enxerga HTTP na rede interna.
+    command: ["start", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: "${KEYCLOAK_ADMIN_USER:-admin}"
+      KEYCLOAK_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD:?defina KEYCLOAK_ADMIN_PASSWORD}"
+      KC_HOSTNAME: auth.tetopro.com
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY: edge
+      KC_DB: postgres
+      KC_DB_URL: "${KC_DB_URL:?defina KC_DB_URL (ex.: jdbc:postgresql://host:5432/keycloak)}"
+      KC_DB_USERNAME: "${KC_DB_USERNAME:?defina KC_DB_USERNAME}"
+      KC_DB_PASSWORD: "${KC_DB_PASSWORD:?defina KC_DB_PASSWORD}"
+    volumes:
+      - ./backend/src/main/resources/keycloak:/opt/keycloak/data/import:ro
+      - tetopro_obra_keycloak_dados:/opt/keycloak/data
+    expose:
+      - "8080"
+
+volumes:
+  tetopro_obra_keycloak_dados:
