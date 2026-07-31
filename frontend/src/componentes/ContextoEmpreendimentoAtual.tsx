@@ -45,3 +45,11 @@ export function useDefinirEmpreendimentoAtual(id: number | undefined, nome: stri
     }
   }, [id, nome, definirEmpreendimentoAtual]);
 }
+
+/** Usado ao trocar de empresa: o empreendimento lembrado pertence à empresa
+ * anterior e não pode sobreviver à troca, senão a barra lateral oferece um
+ * atalho para um empreendimento de outro tenant. */
+export function useLimparEmpreendimentoAtual() {
+  const { definirEmpreendimentoAtual } = useContextoEmpreendimentoAtual();
+  return () => definirEmpreendimentoAtual(null);
+}

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { keycloak } from './keycloak';
 import { obterEmpresaAtiva, definirEmpresaAtiva } from './empresaAtiva';
 import { cliente } from '@/api/cliente';
@@ -38,6 +39,7 @@ function extrairClaims(): ClaimsToken | null {
 }
 
 export function ProvedorAutenticacao({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [carregando, setCarregando] = useState(true);
   const [autenticado, setAutenticado] = useState(false);
   const [ehPlataformaAdmin, setEhPlataformaAdmin] = useState(false);
@@ -100,6 +102,13 @@ export function ProvedorAutenticacao({ children }: { children: ReactNode }) {
   }
 
   function trocarEmpresa() {
+    // Sem isso, dados em cache da empresa anterior (React Query) e a URL de
+    // um empreendimento específico sobrevivem à troca — ao selecionar a nova
+    // empresa a tela remonta na mesma rota, que ou reaproveita dados da
+    // empresa antiga (mesma queryKey) ou tenta abrir um empreendimento que
+    // não existe nela.
+    queryClient.clear();
+    window.history.replaceState(null, '', '/');
     definirEmpresaAtiva(null);
     setEmpresaAtivaId(null);
   }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useMatch, Link } from 'react-router-dom';
 import { useAutenticacao } from '@/autenticacao/ContextoAutenticacao';
-import { useEmpreendimentoAtual } from './ContextoEmpreendimentoAtual';
+import { useEmpreendimentoAtual, useLimparEmpreendimentoAtual } from './ContextoEmpreendimentoAtual';
 import { AlternadorTema } from './AlternadorTema';
 import logo from '@/assets/logo.svg';
 import {
@@ -32,6 +32,7 @@ function iniciais(nome: string) {
 export function AppShell() {
   const { usuario, sair, alterarSenha, temPapel, empresas, trocarEmpresa } = useAutenticacao();
   const empreendimentoAtual = useEmpreendimentoAtual();
+  const limparEmpreendimentoAtual = useLimparEmpreendimentoAtual();
   const dentroDeEmpreendimento = useMatch('/empreendimentos/:id/*');
   const localizacao = useLocation();
 
@@ -60,6 +61,11 @@ export function AppShell() {
   );
 
   const veuMenu = <div className={`veu-menu ${menuAberto ? 'aberto' : ''}`} onClick={() => setMenuAberto(false)} />;
+
+  function aoTrocarEmpresa() {
+    limparEmpreendimentoAtual();
+    trocarEmpresa();
+  }
 
   if (ehAdminDaPlataforma) {
     return (
@@ -230,7 +236,7 @@ export function AppShell() {
             </div>
           </div>
           {empresas.length > 1 && (
-            <button className="botao botao-fantasma botao-pequeno" style={{ width: '100%', marginTop: 8 }} onClick={trocarEmpresa}>
+            <button className="botao botao-fantasma botao-pequeno" style={{ width: '100%', marginTop: 8 }} onClick={aoTrocarEmpresa}>
               Trocar empresa
             </button>
           )}
