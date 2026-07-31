@@ -15,7 +15,7 @@ ARG VITE_KEYCLOAK_URL=http://localhost:8081
 ARG VITE_KEYCLOAK_REALM=tetopro-obra
 ARG VITE_KEYCLOAK_CLIENT_ID=tetopro-obra-frontend
 
-COPY package.json package-lock.json* .npmrc ./
+COPY package.json .npmrc ./
 RUN npm install
 
 COPY . .
