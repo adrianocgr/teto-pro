@@ -21,6 +21,7 @@ import {
   IconeCadeado,
   IconeMenu,
   IconeFechar,
+  IconeSeta,
 } from './Icones';
 
 function iniciais(nome: string) {
@@ -175,6 +176,19 @@ export function AppShell() {
               </NavLink>
             )}
           </div>
+        )}
+
+        {!dentroDeEmpreendimento && empreendimentoAtual && (
+          <Link
+            to={`/empreendimentos/${empreendimentoAtual.id}/resumo`}
+            className="item-nav"
+            title={`Voltar para ${empreendimentoAtual.nome}`}
+          >
+            <IconeSeta style={{ transform: 'rotate(180deg)' }} width={14} height={14} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Voltar para {empreendimentoAtual.nome}
+            </span>
+          </Link>
         )}
 
         {podeGerenciar && (

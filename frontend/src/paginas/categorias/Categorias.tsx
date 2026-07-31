@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type FormEvent } from 'react';
+import { Fragment, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useAutenticacao } from '@/autenticacao/ContextoAutenticacao';
 import { useToast } from '@/componentes/Toast';
 import { IconeMais, IconeEtiqueta, IconeSeta } from '@/componentes/Icones';
@@ -17,6 +17,12 @@ export function Categorias() {
 
   const categorias = data?.content ?? [];
   const categoriasTopo = useMemo(() => categorias.filter((c) => c.categoriaPaiId === null), [categorias]);
+  // Qualquer categoria pode ser pai de outra (profundidade livre) — ordenada
+  // pelo código, que já reflete a hierarquia (ex.: "01", "01.01", "01.01.01", "02").
+  const categoriasOrdenadas = useMemo(
+    () => categorias.slice().sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true })),
+    [categorias],
+  );
   const filhosPorPai = useMemo(() => {
     const mapa = new Map<number, CategoriaResposta[]>();
     for (const categoria of categorias) {
@@ -67,47 +73,50 @@ export function Categorias() {
     );
   }
 
-  function linhaCategoria(categoria: CategoriaResposta, nivel: 0 | 1) {
-    const filhos = nivel === 0 ? (filhosPorPai.get(categoria.id) ?? []) : [];
+  function linhaCategoria(categoria: CategoriaResposta, nivel: number): ReactNode {
+    const filhos = filhosPorPai.get(categoria.id) ?? [];
     const temFilhos = filhos.length > 0;
     const expandida = expandidas.has(categoria.id);
 
     return (
-      <tr key={categoria.id}>
-        <td className="mono">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: nivel * 22 }}>
-            {temFilhos ? (
-              <button
-                type="button"
-                onClick={() => alternarExpandida(categoria.id)}
-                aria-label={expandida ? 'Recolher' : 'Expandir'}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
-                  display: 'inline-flex',
-                  color: 'var(--ink-muted)',
-                  transform: expandida ? 'rotate(90deg)' : 'none',
-                  transition: 'transform 0.12s',
-                }}
-              >
-                <IconeSeta width={12} height={12} />
-              </button>
-            ) : (
-              <span style={{ width: 12, display: 'inline-block' }} />
-            )}
-            {categoria.codigo}
-          </div>
-        </td>
-        <td>{categoria.descricao}</td>
-        <td>
-          <span className={`pilula-status ${categoria.status === 'ATIVO' ? 'status-ativo' : 'status-inativo'}`}>
-            <span className="ponto" />
-            {categoria.status === 'ATIVO' ? 'Ativo' : 'Inativo'}
-          </span>
-        </td>
-      </tr>
+      <Fragment key={categoria.id}>
+        <tr>
+          <td className="mono">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: nivel * 22 }}>
+              {temFilhos ? (
+                <button
+                  type="button"
+                  onClick={() => alternarExpandida(categoria.id)}
+                  aria-label={expandida ? 'Recolher' : 'Expandir'}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'inline-flex',
+                    color: 'var(--ink-muted)',
+                    transform: expandida ? 'rotate(90deg)' : 'none',
+                    transition: 'transform 0.12s',
+                  }}
+                >
+                  <IconeSeta width={12} height={12} />
+                </button>
+              ) : (
+                <span style={{ width: 12, display: 'inline-block' }} />
+              )}
+              {categoria.codigo}
+            </div>
+          </td>
+          <td>{categoria.descricao}</td>
+          <td>
+            <span className={`pilula-status ${categoria.status === 'ATIVO' ? 'status-ativo' : 'status-inativo'}`}>
+              <span className="ponto" />
+              {categoria.status === 'ATIVO' ? 'Ativo' : 'Inativo'}
+            </span>
+          </td>
+        </tr>
+        {expandida && filhos.map((filha) => linhaCategoria(filha, nivel + 1))}
+      </Fragment>
     );
   }
 
@@ -155,15 +164,7 @@ export function Categorias() {
                     <th>Status</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {categoriasTopo.map((categoria) => (
-                    <Fragment key={categoria.id}>
-                      {linhaCategoria(categoria, 0)}
-                      {expandidas.has(categoria.id) &&
-                        (filhosPorPai.get(categoria.id) ?? []).map((filha) => linhaCategoria(filha, 1))}
-                    </Fragment>
-                  ))}
-                </tbody>
+                <tbody>{categoriasTopo.map((categoria) => linhaCategoria(categoria, 0))}</tbody>
               </table>
             </div>
           )}
@@ -195,7 +196,7 @@ export function Categorias() {
                     <label>Categoria pai</label>
                     <select value={categoriaPaiId} onChange={(e) => setCategoriaPaiId(e.target.value)}>
                       <option value="">Nenhuma (categoria de topo)</option>
-                      {categoriasTopo.map((c) => (
+                      {categoriasOrdenadas.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.codigo} — {c.descricao}
                         </option>

@@ -1,11 +1,21 @@
-import { useEffect, useState, type ChangeEvent, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type CSSProperties } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAutenticacao } from '@/autenticacao/ContextoAutenticacao';
 import { useToast } from '@/componentes/Toast';
-import { IconeArquivo, IconeCheck, IconeDownload, IconeLixeira, IconeMais, IconeSeta } from '@/componentes/Icones';
+import {
+  IconeArquivo,
+  IconeCheck,
+  IconeDownload,
+  IconeLixeira,
+  IconeMais,
+  IconeSeta,
+  IconeOlho,
+  IconeFechar,
+} from '@/componentes/Icones';
 import { CampoValorMonetario } from '@/componentes/CamposMascarados';
 import {
   baixarDocumento,
+  visualizarDocumento,
   useAtualizarDespesa,
   useCriarDespesa,
   useDespesa,
@@ -13,6 +23,7 @@ import {
   useUploadDocumentos,
   type DespesaRequisicao,
   type DespesaResposta,
+  type DocumentoResposta,
 } from '@/api/despesas';
 import { useListaCategorias } from '@/api/categorias';
 import { useListaFornecedores } from '@/api/fornecedores';
@@ -137,6 +148,13 @@ export function DespesaDetalhe() {
   const [rascunho, setRascunho] = useState<Rascunho>(
     origemRecorrente ? rascunhoDaOrigemRecorrente(origemRecorrente) : RASCUNHO_VAZIO,
   );
+  const [arrastandoArquivo, setArrastandoArquivo] = useState(false);
+  const [documentoVisualizado, setDocumentoVisualizado] = useState<{
+    url: string;
+    contentType: string;
+    filename: string;
+  } | null>(null);
+  const inputArquivoRef = useRef<HTMLInputElement>(null);
 
   const { data: despesa, isLoading, isError } = useDespesa(ehCriacao ? undefined : Number(despesaId));
   const { data: categoriasResp } = useListaCategorias();
@@ -308,14 +326,33 @@ export function DespesaDetalhe() {
     setModo('visualizacao');
   }
 
-  function aoSelecionarArquivos(evento: ChangeEvent<HTMLInputElement>) {
-    const arquivos = evento.target.files;
-    if (!arquivos || arquivos.length === 0 || !despesa) return;
-    uploadDocumentos.mutate(Array.from(arquivos), {
+  function enviarArquivos(lista: FileList | null) {
+    if (!lista || lista.length === 0 || !despesa) return;
+    uploadDocumentos.mutate(Array.from(lista), {
       onSuccess: () => notificar('Documento(s) enviado(s) com sucesso.'),
       onError: () => notificar('Não foi possível enviar os documentos.', 'erro'),
     });
+  }
+
+  function aoSelecionarArquivos(evento: ChangeEvent<HTMLInputElement>) {
+    enviarArquivos(evento.target.files);
     evento.target.value = '';
+  }
+
+  function aoArrastarSobre(evento: DragEvent<HTMLDivElement>) {
+    evento.preventDefault();
+    setArrastandoArquivo(true);
+  }
+
+  function aoSairArrasto(evento: DragEvent<HTMLDivElement>) {
+    evento.preventDefault();
+    setArrastandoArquivo(false);
+  }
+
+  function aoSoltarArquivos(evento: DragEvent<HTMLDivElement>) {
+    evento.preventDefault();
+    setArrastandoArquivo(false);
+    enviarArquivos(evento.dataTransfer.files);
   }
 
   function aoRemoverDocumento(documentoId: number) {
@@ -332,6 +369,25 @@ export function DespesaDetalhe() {
     } catch {
       notificar('Não foi possível baixar o documento.', 'erro');
     }
+  }
+
+  function documentoVisualizavel(documento: DocumentoResposta) {
+    return documento.contentType.startsWith('image/') || documento.contentType === 'application/pdf';
+  }
+
+  async function aoVisualizarDocumento(documento: DocumentoResposta) {
+    if (!despesa) return;
+    try {
+      const url = await visualizarDocumento(despesa.id, documento.id);
+      setDocumentoVisualizado({ url, contentType: documento.contentType, filename: documento.filename });
+    } catch {
+      notificar('Não foi possível visualizar o documento.', 'erro');
+    }
+  }
+
+  function fecharVisualizacao() {
+    if (documentoVisualizado) URL.revokeObjectURL(documentoVisualizado.url);
+    setDocumentoVisualizado(null);
   }
 
   const titulo = ehCriacao ? 'Nova despesa' : (despesa?.descricao ?? '');
@@ -677,8 +733,22 @@ export function DespesaDetalhe() {
           {emEdicaoOuCriacao && (
             <div className="campo" style={{ marginBottom: 14 }}>
               <label>Anexar documentos</label>
-              <input type="file" multiple disabled={ehCriacao} onChange={aoSelecionarArquivos} />
-              {ehCriacao && <div className="dica">Salve a despesa antes de anexar documentos.</div>}
+              {ehCriacao ? (
+                <div className="dica">Salve a despesa antes de anexar documentos.</div>
+              ) : (
+                <div
+                  className={`dropzone ${arrastandoArquivo ? 'arrastando' : ''}`}
+                  onClick={() => inputArquivoRef.current?.click()}
+                  onDragOver={aoArrastarSobre}
+                  onDragLeave={aoSairArrasto}
+                  onDrop={aoSoltarArquivos}
+                >
+                  <IconeArquivo width={22} height={22} />
+                  <div className="titulo">Arraste os arquivos aqui ou clique para selecionar</div>
+                  <div className="subtitulo">Você pode enviar vários arquivos de uma vez</div>
+                  <input ref={inputArquivoRef} type="file" multiple onChange={aoSelecionarArquivos} />
+                </div>
+              )}
             </div>
           )}
 
@@ -692,6 +762,16 @@ export function DespesaDetalhe() {
                 <span className="chip-arquivo" key={documento.id}>
                   <IconeArquivo width={13} height={13} />
                   {documento.filename}
+                  {documentoVisualizavel(documento) && (
+                    <button
+                      type="button"
+                      style={estiloBotaoChip}
+                      onClick={() => aoVisualizarDocumento(documento)}
+                      title="Visualizar documento"
+                    >
+                      <IconeOlho width={12} height={12} />
+                    </button>
+                  )}
                   <button
                     type="button"
                     style={estiloBotaoChip}
@@ -716,6 +796,26 @@ export function DespesaDetalhe() {
           )}
         </div>
       </div>
+
+      {documentoVisualizado && (
+        <div className="sobreposicao-modal" onClick={fecharVisualizacao}>
+          <div className="modal visualizador-documento" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-cabecalho">
+              <div className="modal-titulo">{documentoVisualizado.filename}</div>
+              <button type="button" className="fechar-modal" onClick={fecharVisualizacao}>
+                <IconeFechar width={15} height={15} />
+              </button>
+            </div>
+            <div className="modal-corpo">
+              {documentoVisualizado.contentType.startsWith('image/') ? (
+                <img src={documentoVisualizado.url} alt={documentoVisualizado.filename} />
+              ) : (
+                <iframe src={documentoVisualizado.url} title={documentoVisualizado.filename} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

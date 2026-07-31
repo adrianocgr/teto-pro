@@ -10,17 +10,28 @@ import { useListaCategorias } from '@/api/categorias';
 import { IconeAlerta } from '@/componentes/Icones';
 import { formatarData, formatarMoeda, formatarMoedaResumida } from '@/utilitarios/formatacao';
 
+interface PagadorResumo {
+  investidorId: number;
+  investidorNome: string;
+  valor: number;
+}
+
 interface DespesaResumo {
   id: number;
   categoriaId: number;
   categoriaDescricao: string;
+  fornecedorId: number | null;
+  fornecedorNome: string | null;
   valorTotal: number;
   dataCadastro: string;
   dataAlteracao: string | null;
   descricao: string;
   usuarioCadastroNome: string | null;
   usuarioAlteracaoNome: string | null;
+  pagadores: PagadorResumo[];
 }
+
+const TOTAL_FORNECEDORES_EXIBIDOS = 5;
 
 const CORES_CATEGORIA = [
   'var(--cat-1)',
@@ -108,6 +119,65 @@ export function Resumo() {
 
   const categoriasEmUso = gastoPorCategoria.length;
   const maiorGastoCategoria = gastoPorCategoria[0]?.total ?? 0;
+
+  const curvaAbcCategorias = useMemo(() => {
+    let acumulado = 0;
+    return gastoPorCategoria.map((item) => {
+      acumulado += item.total;
+      const percentualAcumulado = totalGasto > 0 ? (acumulado / totalGasto) * 100 : 0;
+      const classe: 'A' | 'B' | 'C' =
+        percentualAcumulado <= 80 ? 'A' : percentualAcumulado <= 95 ? 'B' : 'C';
+      return {
+        ...item,
+        percentualItem: totalGasto > 0 ? (item.total / totalGasto) * 100 : 0,
+        percentualAcumulado,
+        classe,
+      };
+    });
+  }, [gastoPorCategoria, totalGasto]);
+
+  const gastoPorInvestidor = useMemo(() => {
+    const mapa = new Map<number, { investidorId: number; nome: string; total: number }>();
+    despesas.forEach((despesa) => {
+      despesa.pagadores?.forEach((pagador) => {
+        const atual = mapa.get(pagador.investidorId);
+        if (atual) {
+          atual.total += Number(pagador.valor ?? 0);
+        } else {
+          mapa.set(pagador.investidorId, {
+            investidorId: pagador.investidorId,
+            nome: pagador.investidorNome,
+            total: Number(pagador.valor ?? 0),
+          });
+        }
+      });
+    });
+    return Array.from(mapa.values())
+      .filter((item) => item.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [despesas]);
+  const maiorGastoInvestidor = gastoPorInvestidor[0]?.total ?? 0;
+
+  const principaisFornecedores = useMemo(() => {
+    const mapa = new Map<number, { fornecedorId: number; nome: string; total: number }>();
+    despesas.forEach((despesa) => {
+      if (!despesa.fornecedorId) return;
+      const atual = mapa.get(despesa.fornecedorId);
+      if (atual) {
+        atual.total += Number(despesa.valorTotal ?? 0);
+      } else {
+        mapa.set(despesa.fornecedorId, {
+          fornecedorId: despesa.fornecedorId,
+          nome: despesa.fornecedorNome ?? '—',
+          total: Number(despesa.valorTotal ?? 0),
+        });
+      }
+    });
+    return Array.from(mapa.values())
+      .sort((a, b) => b.total - a.total)
+      .slice(0, TOTAL_FORNECEDORES_EXIBIDOS);
+  }, [despesas]);
+  const maiorGastoFornecedor = principaisFornecedores[0]?.total ?? 0;
 
   const evolucaoMensal = useMemo(() => {
     const mapa = new Map<string, number>();
@@ -261,6 +331,126 @@ export function Resumo() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="painel">
+        <div className="painel-cabecalho">
+          <div>
+            <div className="painel-titulo">Curva ABC de categorias</div>
+            <div className="painel-subtitulo">
+              Classificação pelo impacto acumulado no total gasto — A até 80%, B até 95%, C o restante
+            </div>
+          </div>
+        </div>
+        <div className="painel-corpo" style={{ padding: 0 }}>
+          {curvaAbcCategorias.length === 0 ? (
+            <div className="estado-vazio">
+              <div className="titulo">Nenhum gasto registrado</div>
+              <div className="subtitulo">Cadastre despesas para ver a curva ABC.</div>
+            </div>
+          ) : (
+            <div className="tabela-scroll">
+              <table className="dados">
+                <thead>
+                  <tr>
+                    <th>Categoria</th>
+                    <th className="num">Valor</th>
+                    <th className="num">% do total</th>
+                    <th className="num">% acumulado</th>
+                    <th>Classe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {curvaAbcCategorias.map((item) => (
+                    <tr key={item.categoriaId}>
+                      <td>{item.descricao}</td>
+                      <td className="num">{formatarMoeda(item.total)}</td>
+                      <td className="num">{item.percentualItem.toFixed(1)}%</td>
+                      <td className="num">{item.percentualAcumulado.toFixed(1)}%</td>
+                      <td>
+                        <span className={`selo-classe classe-${item.classe.toLowerCase()}`}>{item.classe}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="duas-colunas">
+        <div className="painel">
+          <div className="painel-cabecalho">
+            <div>
+              <div className="painel-titulo">Gasto por investidor</div>
+              <div className="painel-subtitulo">Total pago por cada investidor vinculado</div>
+            </div>
+          </div>
+          <div className="painel-corpo">
+            {gastoPorInvestidor.length === 0 ? (
+              <div className="estado-vazio">
+                <div className="titulo">Nenhum pagamento registrado</div>
+                <div className="subtitulo">Cadastre despesas com pagadores para ver a distribuição.</div>
+              </div>
+            ) : (
+              gastoPorInvestidor.map((item, indice) => {
+                const percentualLargura = maiorGastoInvestidor > 0 ? (item.total / maiorGastoInvestidor) * 100 : 0;
+                return (
+                  <div className="linha-barra" key={item.investidorId}>
+                    <div className="rotulo-barra">{item.nome}</div>
+                    <div className="trilho-barra">
+                      <div
+                        className="preenchimento-barra"
+                        style={{
+                          width: `${percentualLargura}%`,
+                          background: CORES_CATEGORIA[indice % CORES_CATEGORIA.length],
+                        }}
+                      />
+                    </div>
+                    <div className="valor-barra">{formatarMoeda(item.total)}</div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="painel">
+          <div className="painel-cabecalho">
+            <div>
+              <div className="painel-titulo">Principais fornecedores</div>
+              <div className="painel-subtitulo">Os {TOTAL_FORNECEDORES_EXIBIDOS} fornecedores que mais receberam</div>
+            </div>
+          </div>
+          <div className="painel-corpo">
+            {principaisFornecedores.length === 0 ? (
+              <div className="estado-vazio">
+                <div className="titulo">Nenhum fornecedor registrado</div>
+                <div className="subtitulo">Cadastre despesas com fornecedor para ver o ranking.</div>
+              </div>
+            ) : (
+              principaisFornecedores.map((item, indice) => {
+                const percentualLargura = maiorGastoFornecedor > 0 ? (item.total / maiorGastoFornecedor) * 100 : 0;
+                return (
+                  <div className="linha-barra" key={item.fornecedorId}>
+                    <div className="rotulo-barra">{item.nome}</div>
+                    <div className="trilho-barra">
+                      <div
+                        className="preenchimento-barra"
+                        style={{
+                          width: `${percentualLargura}%`,
+                          background: CORES_CATEGORIA[indice % CORES_CATEGORIA.length],
+                        }}
+                      />
+                    </div>
+                    <div className="valor-barra">{formatarMoeda(item.total)}</div>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

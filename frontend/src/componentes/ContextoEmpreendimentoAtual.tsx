@@ -32,14 +32,16 @@ export function useEmpreendimentoAtual() {
 
 /** As páginas de detalhe do empreendimento chamam isto para "publicar" o nome
  * carregado — assim que o `id`/`nome` mudarem, a barra lateral atualiza sozinha.
- * Sempre limpa ao desmontar, para não vazar o nome para outras telas. */
+ * Deliberadamente NÃO limpa ao desmontar: sair para um cadastro global
+ * (Fornecedores, Categorias...) e depois voltar não deve exigir escolher o
+ * empreendimento de novo — a barra lateral usa esse valor "lembrado" para
+ * oferecer um atalho de volta (ver AppShell). Só é sobrescrito quando outro
+ * empreendimento é aberto. */
 export function useDefinirEmpreendimentoAtual(id: number | undefined, nome: string | undefined) {
   const { definirEmpreendimentoAtual } = useContextoEmpreendimentoAtual();
   useEffect(() => {
     if (id && nome) {
       definirEmpreendimentoAtual({ id, nome });
     }
-    return () => definirEmpreendimentoAtual(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, nome]);
+  }, [id, nome, definirEmpreendimentoAtual]);
 }

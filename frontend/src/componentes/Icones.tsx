@@ -187,3 +187,10 @@ export const IconeRepetir = (p: SVGProps<SVGSVGElement>) => (
     <path d="M17 3v4h-4M7 21v-4h4" />
   </svg>
 );
+
+export const IconeOlho = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);

@@ -146,6 +146,18 @@ export async function baixarDocumento(despesaId: number, documentoId: number, no
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Mesmo binário do download, mas devolve a URL de objeto pra exibir inline
+ * (imagem/PDF num modal) em vez de salvar em disco — quem chama é
+ * responsável por `URL.revokeObjectURL` quando não precisar mais dela.
+ */
+export async function visualizarDocumento(despesaId: number, documentoId: number): Promise<string> {
+  const resposta = await cliente.get(`/despesas/${despesaId}/documentos/${documentoId}/download`, {
+    responseType: 'blob',
+  });
+  return URL.createObjectURL(resposta.data as Blob);
+}
+
 export function useListaDespesas(empreendimentoId: number | undefined, filtros?: FiltrosDespesas) {
   const busca = filtros?.busca ?? '';
   return useQuery({
