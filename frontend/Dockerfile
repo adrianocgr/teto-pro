@@ -1,5 +1,10 @@
 # ---------- build ----------
-FROM node:20-alpine AS build
+# node:20-slim (Debian), não node:20-alpine: a resolução de DNS da musl libc
+# da Alpine já causou "npm error code E401 ... Sonatype Nexus Repository
+# Manager" nesta VPS em outro projeto — o npm acaba resolvendo o registro
+# pra um proxy Nexus interno em vez do registro público. Ver também
+# frontend/.npmrc, que força explicitamente o registro público.
+FROM node:20-slim AS build
 WORKDIR /build
 
 # Variáveis VITE_* são embutidas no bundle em tempo de BUILD (não em runtime) —
@@ -10,7 +15,7 @@ ARG VITE_KEYCLOAK_URL=http://localhost:8081
 ARG VITE_KEYCLOAK_REALM=tetopro-obra
 ARG VITE_KEYCLOAK_CLIENT_ID=tetopro-obra-frontend
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json* .npmrc ./
 RUN npm install
 
 COPY . .
