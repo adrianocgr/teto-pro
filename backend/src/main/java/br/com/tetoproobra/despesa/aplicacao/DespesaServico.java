@@ -106,12 +106,14 @@ public class DespesaServico {
                 .descricao(requisicao.descricao())
                 .observacao(requisicao.observacao())
                 .dataCadastro(LocalDate.now())
+                .dataPagamento(requisicao.dataPagamento())
                 .build();
 
         List<ItemDespesa> itens = montarItens(despesa, requisicao.itens());
         BigDecimal valorTotal = calcularValorTotal(requisicao, itens);
         despesa.getItens().addAll(itens);
         despesa.setValorTotal(valorTotal);
+        despesa.setDesconto(requisicao.desconto() != null ? requisicao.desconto() : BigDecimal.ZERO);
 
         List<PagadorDespesa> pagadores = montarPagadores(despesa, requisicao.pagadores());
         validarRateio(pagadores, valorTotal);
@@ -161,6 +163,7 @@ public class DespesaServico {
         despesa.setFornecedor(fornecedor);
         despesa.setDescricao(requisicao.descricao());
         despesa.setObservacao(requisicao.observacao());
+        despesa.setDataPagamento(requisicao.dataPagamento());
 
         // O flush aqui é necessário: com orphanRemoval, Hibernate executa INSERTs
         // de entidade antes de DELETEs na mesma flush — sem forçar o DELETE dos
@@ -176,6 +179,7 @@ public class DespesaServico {
         BigDecimal valorTotal = calcularValorTotal(requisicao, novosItens);
         despesa.getItens().addAll(novosItens);
         despesa.setValorTotal(valorTotal);
+        despesa.setDesconto(requisicao.desconto() != null ? requisicao.desconto() : BigDecimal.ZERO);
 
         List<PagadorDespesa> novosPagadores = montarPagadores(despesa, requisicao.pagadores());
         validarRateio(novosPagadores, valorTotal);
@@ -306,17 +310,30 @@ public class DespesaServico {
      * Fonte da verdade do valor total: quando há itens, é sempre a soma
      * deles (o {@code valorTotal} da requisição é ignorado nesse caso).
      * Quando não há itens, usa o {@code valorTotal} informado diretamente.
+     * Em ambos os casos, {@code desconto} é subtraído do valor bruto antes
+     * de retornar — o valor total salvo (e usado no rateio dos pagadores)
+     * já é líquido de desconto.
      */
     private BigDecimal calcularValorTotal(DespesaRequisicao requisicao, List<ItemDespesa> itens) {
+        BigDecimal bruto;
         if (!itens.isEmpty()) {
-            return itens.stream().map(ItemDespesa::getValorTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+            bruto = itens.stream().map(ItemDespesa::getValorTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+        } else {
+            bruto = requisicao.valorTotal();
+            if (bruto == null || bruto.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new RegraDeNegocioException("Informe o valor total ou ao menos um item");
+            }
         }
 
-        BigDecimal valorTotal = requisicao.valorTotal();
-        if (valorTotal == null || valorTotal.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new RegraDeNegocioException("Informe o valor total ou ao menos um item");
+        BigDecimal desconto = requisicao.desconto() != null ? requisicao.desconto() : BigDecimal.ZERO;
+        if (desconto.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RegraDeNegocioException("O desconto não pode ser negativo");
         }
-        return valorTotal;
+        if (desconto.compareTo(bruto) > 0) {
+            throw new RegraDeNegocioException("O desconto não pode ser maior que o valor total");
+        }
+
+        return bruto.subtract(desconto).setScale(2, RoundingMode.HALF_UP);
     }
 
     private List<PagadorDespesa> montarPagadores(Despesa despesa, List<PagadorRequisicao> pagadoresRequisicao) {

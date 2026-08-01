@@ -22,6 +22,7 @@ import {
   IconeMenu,
   IconeFechar,
   IconeSeta,
+  IconeRelatorio,
 } from './Icones';
 
 function iniciais(nome: string) {
@@ -181,6 +182,14 @@ export function AppShell() {
                 <IconeFechamento /> <span>Fechamento</span>
               </NavLink>
             )}
+
+            <div className="rotulo-nav">Relatórios</div>
+            <NavLink
+              to={`/empreendimentos/${empreendimentoAtual.id}/relatorios/extrato-despesas`}
+              className={({ isActive }) => `item-nav ${isActive ? 'ativo' : ''}`}
+            >
+              <IconeRelatorio /> <span>Extrato de despesas</span>
+            </NavLink>
           </div>
         )}
 

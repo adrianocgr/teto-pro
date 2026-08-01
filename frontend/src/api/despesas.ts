@@ -51,8 +51,10 @@ export interface DespesaResposta {
   descricao: string;
   observacao: string | null;
   valorTotal: number;
+  desconto: number;
   dataCadastro: string;
   dataAlteracao: string | null;
+  dataPagamento: string | null;
   usuarioCadastroNome: string;
   usuarioAlteracaoNome: string | null;
   itens: ItemResposta[];
@@ -75,10 +77,12 @@ export interface DespesaRequisicao {
   descricao: string;
   observacao: string | null;
   valorTotal: number | null;
+  desconto: number | null;
   itens: ItemRequisicao[];
   pagadores: PagadorRequisicao[];
   recorrenciaId?: number | null;
   competencia?: string | null;
+  dataPagamento?: string | null;
 }
 
 export interface FiltrosDespesas {
@@ -113,7 +117,7 @@ async function excluirDespesa(id: number): Promise<void> {
   await cliente.delete(`/despesas/${id}`);
 }
 
-async function uploadDocumentos(despesaId: number, arquivos: File[]): Promise<DocumentoResposta[]> {
+export async function uploadDocumentos(despesaId: number, arquivos: File[]): Promise<DocumentoResposta[]> {
   const formData = new FormData();
   arquivos.forEach((arquivo) => formData.append('arquivos', arquivo));
   const resposta = await cliente.post<DocumentoResposta[]>(`/despesas/${despesaId}/documentos`, formData, {
@@ -156,6 +160,37 @@ export async function visualizarDocumento(despesaId: number, documentoId: number
     responseType: 'blob',
   });
   return URL.createObjectURL(resposta.data as Blob);
+}
+
+export interface ItemNfeResposta {
+  insumoId: number;
+  insumoDescricao: string;
+  unidadeSigla: string;
+  insumoNovo: boolean;
+  quantidade: number;
+  valorUnitario: number;
+}
+
+export interface ImportacaoNfeResposta {
+  fornecedorId: number;
+  fornecedorNome: string;
+  fornecedorNovo: boolean;
+  descricaoSugerida: string;
+  valorTotal: number | null;
+  desconto: number | null;
+  dataEmissao: string | null;
+  numeroNota: string | null;
+  chaveAcesso: string | null;
+  itens: ItemNfeResposta[];
+}
+
+export async function importarNfe(arquivo: File): Promise<ImportacaoNfeResposta> {
+  const formData = new FormData();
+  formData.append('arquivo', arquivo);
+  const resposta = await cliente.post<ImportacaoNfeResposta>('/despesas/importar-nfe', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return resposta.data;
 }
 
 export function useListaDespesas(empreendimentoId: number | undefined, filtros?: FiltrosDespesas) {

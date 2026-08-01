@@ -13,6 +13,7 @@ import { ListaDespesas } from './paginas/despesas/ListaDespesas';
 import { DespesaDetalhe } from './paginas/despesas/DespesaDetalhe';
 import { DespesasRecorrentes } from './paginas/despesas/DespesasRecorrentes';
 import { Fechamento } from './paginas/fechamento/Fechamento';
+import { ExtratoDespesas } from './paginas/relatorios/ExtratoDespesas';
 import { Fornecedores } from './paginas/fornecedores/Fornecedores';
 import { Categorias } from './paginas/categorias/Categorias';
 import { Insumos } from './paginas/insumos/Insumos';
@@ -63,6 +64,7 @@ export function App() {
                     <Route path="despesas-recorrentes" element={<DespesasRecorrentes />} />
                     <Route path="investidores" element={<InvestidoresEmpreendimento />} />
                     <Route path="fechamento" element={<Fechamento />} />
+                    <Route path="relatorios/extrato-despesas" element={<ExtratoDespesas />} />
                   </Route>
                   <Route path="/fornecedores" element={<Fornecedores />} />
                   <Route path="/categorias" element={<Categorias />} />

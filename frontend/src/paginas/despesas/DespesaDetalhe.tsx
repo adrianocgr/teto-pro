@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent, type CSSProperties } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAutenticacao } from '@/autenticacao/ContextoAutenticacao';
 import { useToast } from '@/componentes/Toast';
 import {
@@ -11,11 +12,15 @@ import {
   IconeSeta,
   IconeOlho,
   IconeFechar,
+  IconeImportar,
+  IconeEditar,
 } from '@/componentes/Icones';
 import { CampoValorMonetario } from '@/componentes/CamposMascarados';
 import {
   baixarDocumento,
   visualizarDocumento,
+  importarNfe,
+  uploadDocumentos as enviarDocumentosParaDespesa,
   useAtualizarDespesa,
   useCriarDespesa,
   useDespesa,
@@ -27,7 +32,9 @@ import {
 } from '@/api/despesas';
 import { useListaCategorias } from '@/api/categorias';
 import { useListaFornecedores } from '@/api/fornecedores';
-import { useListaInsumos } from '@/api/insumos';
+import { useCriarInsumo, useAtualizarInsumo, useListaInsumos, type InsumoResposta } from '@/api/insumos';
+import { useListaUnidadesMedida } from '@/api/unidadesMedida';
+import { useListaClassificacoes } from '@/api/classificacoes';
 import { useEmpreendimento } from '@/api/empreendimentos';
 import { formatarData, formatarMoeda } from '@/utilitarios/formatacao';
 
@@ -52,6 +59,8 @@ interface Rascunho {
   fornecedorId: string;
   observacao: string;
   valorTotal: string;
+  desconto: string;
+  dataPagamento: string;
   itens: ItemRascunho[];
   pagadores: PagadorRascunho[];
 }
@@ -68,6 +77,8 @@ const RASCUNHO_VAZIO: Rascunho = {
   fornecedorId: '',
   observacao: '',
   valorTotal: '',
+  desconto: '',
+  dataPagamento: '',
   itens: [],
   pagadores: [],
 };
@@ -90,6 +101,8 @@ function rascunhoDaOrigemRecorrente(origem: OrigemRecorrente): Rascunho {
     fornecedorId: origem.fornecedorId ? String(origem.fornecedorId) : '',
     observacao: '',
     valorTotal: origem.valorPadrao !== null ? String(origem.valorPadrao) : '',
+    desconto: '',
+    dataPagamento: '',
     itens: [],
     pagadores: origem.pagadores.map((p) => ({
       chave: novaChave(),
@@ -105,7 +118,11 @@ function paraRascunho(despesa: DespesaResposta): Rascunho {
     categoriaId: String(despesa.categoriaId),
     fornecedorId: despesa.fornecedorId ? String(despesa.fornecedorId) : '',
     observacao: despesa.observacao ?? '',
-    valorTotal: despesa.itens.length === 0 ? String(despesa.valorTotal) : '',
+    // `despesa.valorTotal` já é líquido de desconto — o campo bruto (mostrado
+    // quando não há itens) é reconstruído somando o desconto de volta.
+    valorTotal: despesa.itens.length === 0 ? String(despesa.valorTotal + despesa.desconto) : '',
+    desconto: despesa.desconto > 0 ? String(despesa.desconto) : '',
+    dataPagamento: despesa.dataPagamento ?? '',
     itens: despesa.itens.map((item) => ({
       chave: novaChave(),
       insumoId: String(item.insumoId),
@@ -138,6 +155,7 @@ export function DespesaDetalhe() {
   const location = useLocation();
   const { temPapel } = useAutenticacao();
   const { notificar } = useToast();
+  const queryClient = useQueryClient();
 
   // Presente só quando se chega aqui pelo botão "Lançar" de uma despesa
   // recorrente (ver DespesasRecorrentes.tsx) — pré-preenche o rascunho e
@@ -155,22 +173,45 @@ export function DespesaDetalhe() {
     filename: string;
   } | null>(null);
   const inputArquivoRef = useRef<HTMLInputElement>(null);
+  const inputNfeRef = useRef<HTMLInputElement>(null);
+  const [importandoNfe, setImportandoNfe] = useState(false);
+  // Guardado aqui (não enviado ao importar) porque, na criação, a despesa
+  // ainda não existe — o XML só pode ser anexado como documento depois que
+  // ela é efetivamente salva (ver aoSalvar).
+  const [arquivoNfeParaAnexar, setArquivoNfeParaAnexar] = useState<File | null>(null);
+
+  const [modalInsumoAberto, setModalInsumoAberto] = useState(false);
+  const [insumoEmEdicaoId, setInsumoEmEdicaoId] = useState<number | null>(null);
+  const [itemChaveAlvo, setItemChaveAlvo] = useState<string | null>(null);
+  const [formInsumo, setFormInsumo] = useState({
+    codigo: '',
+    descricao: '',
+    unidadeMedidaId: '',
+    classificacaoId: '',
+    precoReferencia: '',
+  });
 
   const { data: despesa, isLoading, isError } = useDespesa(ehCriacao ? undefined : Number(despesaId));
   const { data: categoriasResp } = useListaCategorias();
   const { data: fornecedoresResp } = useListaFornecedores();
   const { data: insumosResp } = useListaInsumos();
+  const { data: unidadesResp } = useListaUnidadesMedida();
+  const { data: classificacoesResp } = useListaClassificacoes();
   const { data: empreendimento } = useEmpreendimento(empreendimentoId);
 
   const categorias = categoriasResp?.content ?? [];
   const fornecedores = fornecedoresResp?.content ?? [];
   const insumos = insumosResp?.content ?? [];
+  const unidadesMedida = unidadesResp?.content ?? [];
+  const classificacoes = classificacoesResp?.content ?? [];
   const participacoes = empreendimento?.participacoes ?? [];
 
   const criarDespesa = useCriarDespesa();
   const atualizarDespesa = useAtualizarDespesa(despesa?.id);
   const uploadDocumentos = useUploadDocumentos(despesa?.id);
   const removerDocumento = useRemoverDocumento(despesa?.id);
+  const criarInsumo = useCriarInsumo();
+  const atualizarInsumoMutacao = useAtualizarInsumo();
 
   useEffect(() => {
     if (despesa) {
@@ -198,12 +239,16 @@ export function DespesaDetalhe() {
 
   const temItens = rascunho.itens.length > 0;
 
-  const valorTotalCalculado = temItens
+  const valorBruto = temItens
     ? rascunho.itens.reduce(
         (soma, item) => soma + (Number(item.quantidade) || 0) * (Number(item.valorUnitario) || 0),
         0,
       )
     : Number(rascunho.valorTotal) || 0;
+
+  const desconto = Number(rascunho.desconto) || 0;
+  const descontoValido = desconto >= 0 && desconto <= valorBruto;
+  const valorTotalCalculado = Math.max(valorBruto - desconto, 0);
 
   const somaPagadores = rascunho.pagadores.reduce((soma, pagador) => soma + (Number(pagador.valor) || 0), 0);
   const diferenca = Math.round((valorTotalCalculado - somaPagadores) * 100) / 100;
@@ -220,8 +265,17 @@ export function DespesaDetalhe() {
     rascunho.descricao.trim().length > 0 &&
     !!rascunho.categoriaId &&
     itensValidos &&
+    descontoValido &&
     pagadoresValidos &&
     somaBate;
+
+  const pendencias: string[] = [];
+  if (!rascunho.descricao.trim()) pendencias.push('informe a descrição');
+  if (!rascunho.categoriaId) pendencias.push('selecione uma categoria');
+  if (!itensValidos) pendencias.push('preencha insumo, quantidade e valor de todos os itens');
+  if (!descontoValido) pendencias.push('o desconto não pode ser maior que o valor total nem negativo');
+  if (!pagadoresValidos) pendencias.push('adicione ao menos um pagador');
+  else if (!somaBate) pendencias.push('a soma dos pagadores precisa bater com o valor total');
 
   const salvando = criarDespesa.isPending || atualizarDespesa.isPending;
 
@@ -253,6 +307,77 @@ export function DespesaDetalhe() {
     }));
   }
 
+  function abrirModalNovoInsumo(chaveItem: string) {
+    setInsumoEmEdicaoId(null);
+    setItemChaveAlvo(chaveItem);
+    setFormInsumo({ codigo: '', descricao: '', unidadeMedidaId: '', classificacaoId: '', precoReferencia: '' });
+    setModalInsumoAberto(true);
+  }
+
+  function abrirModalEditarInsumo(chaveItem: string, insumoId: string) {
+    const insumo = insumos.find((i) => String(i.id) === insumoId);
+    if (!insumo) return;
+    setInsumoEmEdicaoId(insumo.id);
+    setItemChaveAlvo(chaveItem);
+    setFormInsumo({
+      codigo: insumo.codigo,
+      descricao: insumo.descricao,
+      unidadeMedidaId: String(insumo.unidadeMedidaId),
+      classificacaoId: String(insumo.classificacaoId),
+      precoReferencia: String(insumo.precoReferencia),
+    });
+    setModalInsumoAberto(true);
+  }
+
+  function fecharModalInsumo() {
+    setModalInsumoAberto(false);
+    setItemChaveAlvo(null);
+  }
+
+  function aoSubmeterInsumo(evento: FormEvent) {
+    evento.preventDefault();
+    const payload = {
+      codigo: formInsumo.codigo,
+      descricao: formInsumo.descricao,
+      unidadeMedidaId: Number(formInsumo.unidadeMedidaId),
+      classificacaoId: Number(formInsumo.classificacaoId),
+      precoReferencia: Number(formInsumo.precoReferencia),
+    };
+
+    function aoConcluir(insumoResultado: InsumoResposta) {
+      notificar(insumoEmEdicaoId ? 'Insumo atualizado com sucesso.' : 'Insumo criado com sucesso.');
+      const criandoNovo = insumoEmEdicaoId === null;
+      if (itemChaveAlvo) {
+        setRascunho((r) => ({
+          ...r,
+          itens: r.itens.map((item) =>
+            item.chave === itemChaveAlvo
+              ? {
+                  ...item,
+                  insumoId: String(insumoResultado.id),
+                  valorUnitario: criandoNovo ? String(insumoResultado.precoReferencia) : item.valorUnitario,
+                }
+              : item,
+          ),
+        }));
+      }
+      setModalInsumoAberto(false);
+      setItemChaveAlvo(null);
+    }
+
+    if (insumoEmEdicaoId) {
+      atualizarInsumoMutacao.mutate(
+        { id: insumoEmEdicaoId, dados: payload },
+        { onSuccess: aoConcluir, onError: () => notificar('Não foi possível salvar o insumo.', 'erro') },
+      );
+    } else {
+      criarInsumo.mutate(payload, {
+        onSuccess: aoConcluir,
+        onError: () => notificar('Não foi possível salvar o insumo.', 'erro'),
+      });
+    }
+  }
+
   function adicionarPagador() {
     setRascunho((r) => ({
       ...r,
@@ -279,6 +404,7 @@ export function DespesaDetalhe() {
       descricao: rascunho.descricao.trim(),
       observacao: rascunho.observacao.trim() || null,
       valorTotal: temItens ? null : Number(rascunho.valorTotal) || null,
+      desconto: rascunho.desconto ? Number(rascunho.desconto) : null,
       itens: rascunho.itens.map((item) => ({
         insumoId: Number(item.insumoId),
         quantidade: Number(item.quantidade),
@@ -290,6 +416,7 @@ export function DespesaDetalhe() {
       })),
       recorrenciaId: origemRecorrente?.recorrenciaId,
       competencia: origemRecorrente?.competencia,
+      dataPagamento: rascunho.dataPagamento || null,
     };
   }
 
@@ -298,7 +425,14 @@ export function DespesaDetalhe() {
     const payload = montarPayload();
     if (ehCriacao) {
       criarDespesa.mutate(payload, {
-        onSuccess: (despesaCriada) => {
+        onSuccess: async (despesaCriada) => {
+          if (arquivoNfeParaAnexar) {
+            try {
+              await enviarDocumentosParaDespesa(despesaCriada.id, [arquivoNfeParaAnexar]);
+            } catch {
+              notificar('Despesa criada, mas não foi possível anexar o XML da NF-e.', 'erro');
+            }
+          }
           notificar('Despesa criada com sucesso.');
           navigate(`/empreendimentos/${empreendimentoId}/despesas/${despesaCriada.id}`, { replace: true });
         },
@@ -324,6 +458,57 @@ export function DespesaDetalhe() {
       setRascunho(paraRascunho(despesa));
     }
     setModo('visualizacao');
+  }
+
+  async function aoSelecionarArquivoNfe(evento: ChangeEvent<HTMLInputElement>) {
+    const arquivo = evento.target.files?.[0];
+    evento.target.value = '';
+    if (!arquivo) return;
+
+    setImportandoNfe(true);
+    try {
+      const resultado = await importarNfe(arquivo);
+      queryClient.invalidateQueries({ queryKey: ['fornecedores'] });
+      queryClient.invalidateQueries({ queryKey: ['insumos'] });
+      const temItensNfe = resultado.itens.length > 0;
+      setRascunho((r) => ({
+        ...r,
+        descricao: resultado.descricaoSugerida,
+        fornecedorId: String(resultado.fornecedorId),
+        valorTotal: !temItensNfe && resultado.valorTotal !== null ? String(resultado.valorTotal) : r.valorTotal,
+        desconto: resultado.desconto !== null && resultado.desconto > 0 ? String(resultado.desconto) : r.desconto,
+        itens: temItensNfe
+          ? resultado.itens.map((item) => ({
+              chave: novaChave(),
+              insumoId: String(item.insumoId),
+              quantidade: String(item.quantidade),
+              valorUnitario: String(item.valorUnitario),
+            }))
+          : r.itens,
+        observacao: [
+          resultado.numeroNota ? `NF-e nº ${resultado.numeroNota}` : null,
+          resultado.chaveAcesso ? `Chave: ${resultado.chaveAcesso}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      }));
+      setArquivoNfeParaAnexar(arquivo);
+      const insumosNovos = resultado.itens.filter((item) => item.insumoNovo).length;
+      const partesAviso = [
+        resultado.fornecedorNovo ? `fornecedor "${resultado.fornecedorNome}" cadastrado` : null,
+        insumosNovos > 0 ? `${insumosNovos} insumo(s) cadastrado(s)` : null,
+      ].filter(Boolean);
+      notificar(
+        partesAviso.length > 0
+          ? `NF-e importada — ${partesAviso.join(' e ')} automaticamente. Revise os dados antes de salvar.`
+          : 'Dados da NF-e importados. Revise os dados antes de salvar.',
+      );
+    } catch (erro) {
+      const mensagem = (erro as { response?: { data?: { mensagem?: string } } })?.response?.data?.mensagem;
+      notificar(mensagem || 'Não foi possível importar o arquivo XML da NF-e.', 'erro');
+    } finally {
+      setImportandoNfe(false);
+    }
   }
 
   function enviarArquivos(lista: FileList | null) {
@@ -401,7 +586,7 @@ export function DespesaDetalhe() {
         <IconeSeta /> Voltar para despesas
       </Link>
 
-      <div className="cabecalho-pagina">
+      <div className="cabecalho-pagina cabecalho-fixo-secundario">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div className="titulo-pagina">{titulo}</div>
@@ -443,9 +628,35 @@ export function DespesaDetalhe() {
         </div>
       </div>
 
+      {emEdicaoOuCriacao && !salvando && pendencias.length > 0 && (
+        <div className="dica" style={{ textAlign: 'right', marginTop: -10, marginBottom: 14 }}>
+          Para salvar: {pendencias.join(' · ')}.
+        </div>
+      )}
+
       <div className="painel">
         <div className="painel-cabecalho">
           <div className="painel-titulo">Dados da despesa</div>
+          {ehCriacao && (
+            <div>
+              <button
+                type="button"
+                className="botao botao-pequeno"
+                disabled={importandoNfe}
+                onClick={() => inputNfeRef.current?.click()}
+              >
+                <IconeImportar width={13} height={13} />
+                {importandoNfe ? 'Lendo NF-e…' : 'Importar NF-e (XML)'}
+              </button>
+              <input
+                ref={inputNfeRef}
+                type="file"
+                accept=".xml,text/xml,application/xml"
+                style={{ display: 'none' }}
+                onChange={aoSelecionarArquivoNfe}
+              />
+            </div>
+          )}
         </div>
         <div className="painel-corpo">
           {!emEdicaoOuCriacao ? (
@@ -461,6 +672,12 @@ export function DespesaDetalhe() {
               <div className="campo">
                 <label>Fornecedor</label>
                 <div className="campo-estatico">{despesa?.fornecedorNome ?? 'Sem fornecedor'}</div>
+              </div>
+              <div className="campo">
+                <label>Data de pagamento</label>
+                <div className="campo-estatico">
+                  {despesa?.dataPagamento ? formatarData(despesa.dataPagamento) : 'Não informada'}
+                </div>
               </div>
               <div className="campo col-2">
                 <label>Observação</label>
@@ -506,6 +723,15 @@ export function DespesaDetalhe() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="campo">
+                <label>Data de pagamento</label>
+                <input
+                  type="date"
+                  value={rascunho.dataPagamento}
+                  onChange={(e) => setRascunho((r) => ({ ...r, dataPagamento: e.target.value }))}
+                />
+                <div className="dica">Opcional — preencha quando a despesa já tiver sido paga.</div>
               </div>
               <div className="campo col-2">
                 <label>Observação</label>
@@ -569,39 +795,77 @@ export function DespesaDetalhe() {
                       {formatarMoeda((Number(item.quantidade) || 0) * (Number(item.valorUnitario) || 0))}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="botao-icone"
-                    onClick={() => removerItem(item.chave)}
-                    title="Remover item"
-                  >
-                    <IconeLixeira width={15} height={15} />
-                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {temPapel('ADMIN') && (
+                      <button
+                        type="button"
+                        className="botao-icone"
+                        onClick={() => abrirModalNovoInsumo(item.chave)}
+                        title="Novo insumo"
+                      >
+                        <IconeMais width={15} height={15} />
+                      </button>
+                    )}
+                    {temPapel('ADMIN') && item.insumoId && (
+                      <button
+                        type="button"
+                        className="botao-icone"
+                        onClick={() => abrirModalEditarInsumo(item.chave, item.insumoId)}
+                        title="Editar insumo"
+                      >
+                        <IconeEditar width={15} height={15} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="botao-icone"
+                      onClick={() => removerItem(item.chave)}
+                      title="Remover item"
+                    >
+                      <IconeLixeira width={15} height={15} />
+                    </button>
+                  </div>
                 </div>
               ))}
               <button type="button" className="botao-adicionar-linha" onClick={adicionarItem}>
                 <IconeMais width={13} height={13} /> Adicionar item
               </button>
 
-              {temItens ? (
-                <div className="campo" style={{ maxWidth: 280, marginTop: 14 }}>
-                  <label>Valor total (soma dos itens)</label>
-                  <div className="apenas-leitura mono" style={{ textAlign: 'left' }}>
-                    {formatarMoeda(valorTotalCalculado)}
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 14 }}>
+                {temItens ? (
+                  <div className="campo" style={{ maxWidth: 220 }}>
+                    <label>Valor total (soma dos itens)</label>
+                    <div className="apenas-leitura mono" style={{ textAlign: 'left' }}>
+                      {formatarMoeda(valorBruto)}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="campo" style={{ maxWidth: 280, marginTop: 14 }}>
-                  <label>Valor total</label>
+                ) : (
+                  <div className="campo" style={{ maxWidth: 220 }}>
+                    <label>Valor total</label>
+                    <CampoValorMonetario
+                      valor={rascunho.valorTotal}
+                      onValorAlterado={(v) => setRascunho((r) => ({ ...r, valorTotal: v }))}
+                    />
+                    <div className="dica">Sem itens — informe o valor diretamente, como uma escritura ou taxa.</div>
+                  </div>
+                )}
+                <div className="campo" style={{ maxWidth: 220 }}>
+                  <label>Desconto</label>
                   <CampoValorMonetario
-                    valor={rascunho.valorTotal}
-                    onValorAlterado={(v) => setRascunho((r) => ({ ...r, valorTotal: v }))}
+                    valor={rascunho.desconto}
+                    onValorAlterado={(v) => setRascunho((r) => ({ ...r, desconto: v }))}
                   />
-                  <div className="dica">
-                    Sem itens cadastrados — informe o valor diretamente, como uma escritura ou taxa.
-                  </div>
+                  {!descontoValido && <div className="erro">Não pode ser maior que o valor total.</div>}
                 </div>
-              )}
+                {desconto > 0 && (
+                  <div className="campo" style={{ maxWidth: 220 }}>
+                    <label>Valor total após desconto</label>
+                    <div className="apenas-leitura mono" style={{ textAlign: 'left' }}>
+                      {formatarMoeda(valorTotalCalculado)}
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -635,9 +899,28 @@ export function DespesaDetalhe() {
                   </table>
                 </div>
               )}
-              <div className="campo" style={{ maxWidth: 280, marginTop: 14 }}>
-                <label>{(despesa?.itens.length ?? 0) > 0 ? 'Valor total (soma dos itens)' : 'Valor total'}</label>
-                <div className="campo-estatico mono">{formatarMoeda(despesa?.valorTotal)}</div>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 14 }}>
+                <div className="campo" style={{ maxWidth: 220 }}>
+                  <label>
+                    {(despesa?.itens.length ?? 0) > 0 ? 'Valor total (soma dos itens)' : 'Valor total'}
+                    {(despesa?.desconto ?? 0) > 0 ? ' (bruto)' : ''}
+                  </label>
+                  <div className="campo-estatico mono">
+                    {formatarMoeda((despesa?.valorTotal ?? 0) + (despesa?.desconto ?? 0))}
+                  </div>
+                </div>
+                {(despesa?.desconto ?? 0) > 0 && (
+                  <>
+                    <div className="campo" style={{ maxWidth: 220 }}>
+                      <label>Desconto</label>
+                      <div className="campo-estatico mono">{formatarMoeda(despesa?.desconto)}</div>
+                    </div>
+                    <div className="campo" style={{ maxWidth: 220 }}>
+                      <label>Valor total após desconto</label>
+                      <div className="campo-estatico mono">{formatarMoeda(despesa?.valorTotal)}</div>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -813,6 +1096,93 @@ export function DespesaDetalhe() {
                 <iframe src={documentoVisualizado.url} title={documentoVisualizado.filename} />
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {modalInsumoAberto && (
+        <div className="sobreposicao-modal" onClick={fecharModalInsumo}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-cabecalho">
+              <div className="modal-titulo">{insumoEmEdicaoId ? 'Editar insumo' : 'Novo insumo'}</div>
+              <button type="button" className="fechar-modal" onClick={fecharModalInsumo}>
+                <IconeFechar width={15} height={15} />
+              </button>
+            </div>
+            <form onSubmit={aoSubmeterInsumo}>
+              <div className="modal-corpo">
+                <div className="grade-formulario">
+                  <div className="campo">
+                    <label>Código</label>
+                    <input
+                      type="text"
+                      value={formInsumo.codigo}
+                      onChange={(e) => setFormInsumo((f) => ({ ...f, codigo: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="campo">
+                    <label>Descrição</label>
+                    <input
+                      type="text"
+                      value={formInsumo.descricao}
+                      onChange={(e) => setFormInsumo((f) => ({ ...f, descricao: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="campo">
+                    <label>Classificação</label>
+                    <select
+                      value={formInsumo.classificacaoId}
+                      onChange={(e) => setFormInsumo((f) => ({ ...f, classificacaoId: e.target.value }))}
+                      required
+                    >
+                      <option value="">Selecione…</option>
+                      {classificacoes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.descricao}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="campo">
+                    <label>Unidade de medida</label>
+                    <select
+                      value={formInsumo.unidadeMedidaId}
+                      onChange={(e) => setFormInsumo((f) => ({ ...f, unidadeMedidaId: e.target.value }))}
+                      required
+                    >
+                      <option value="">Selecione…</option>
+                      {unidadesMedida.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.sigla} — {u.descricao}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="campo col-2">
+                    <label>Preço de referência</label>
+                    <CampoValorMonetario
+                      valor={formInsumo.precoReferencia}
+                      onValorAlterado={(v) => setFormInsumo((f) => ({ ...f, precoReferencia: v }))}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-rodape">
+                <button type="button" className="botao" onClick={fecharModalInsumo}>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="botao botao-primario"
+                  disabled={criarInsumo.isPending || atualizarInsumoMutacao.isPending}
+                >
+                  {criarInsumo.isPending || atualizarInsumoMutacao.isPending ? 'Salvando…' : 'Salvar'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

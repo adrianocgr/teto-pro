@@ -31,6 +31,11 @@ async function criarInsumo(dados: InsumoRequisicao): Promise<InsumoResposta> {
   return resposta.data;
 }
 
+async function atualizarInsumo(id: number, dados: InsumoRequisicao): Promise<InsumoResposta> {
+  const resposta = await cliente.put<InsumoResposta>(`/insumos/${id}`, dados);
+  return resposta.data;
+}
+
 export function useListaInsumos() {
   return useQuery({ queryKey: ['insumos'], queryFn: listarInsumos });
 }
@@ -39,6 +44,14 @@ export function useCriarInsumo() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: criarInsumo,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['insumos'] }),
+  });
+}
+
+export function useAtualizarInsumo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dados }: { id: number; dados: InsumoRequisicao }) => atualizarInsumo(id, dados),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['insumos'] }),
   });
 }

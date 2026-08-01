@@ -72,8 +72,25 @@ public class Despesa extends EntidadeComTenant {
     @Column(name = "de_valor_total", nullable = false, precision = 14, scale = 2)
     private BigDecimal valorTotal;
 
+    /**
+     * Desconto já subtraído do valor bruto (soma dos itens ou valor
+     * informado) para chegar em {@code valorTotal} — o valor efetivamente
+     * pago pelos investidores. Ex.: nota de R$ 1.000 com desconto de R$ 50
+     * vira {@code valorTotal} = R$ 950.
+     */
+    @Column(name = "de_desconto", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal desconto = BigDecimal.ZERO;
+
     @Column(name = "de_data_cadastro", nullable = false)
     private LocalDate dataCadastro;
+
+    /**
+     * Data em que a despesa foi efetivamente paga — opcional, informada
+     * manualmente (não é preenchida automaticamente ao cadastrar).
+     */
+    @Column(name = "de_data_pagamento")
+    private LocalDate dataPagamento;
 
     @Column(name = "de_data_alteracao")
     private LocalDate dataAlteracao;

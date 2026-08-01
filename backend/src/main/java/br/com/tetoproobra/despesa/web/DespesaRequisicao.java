@@ -11,7 +11,9 @@ import java.util.List;
  * {@code valorTotal} só é considerado quando {@code itens} vem vazio/nulo —
  * quando há itens, o valor total é sempre recalculado a partir deles (fonte
  * da verdade), e este campo é ignorado (ver
- * {@link br.com.tetoproobra.despesa.aplicacao.DespesaServico}).
+ * {@link br.com.tetoproobra.despesa.aplicacao.DespesaServico}). Em ambos os
+ * casos, {@code desconto} (opcional, padrão zero) é subtraído do valor bruto
+ * — o valor final salvo já é líquido de desconto.
  * <p>
  * {@code recorrenciaId}/{@code competencia} só são usados na CRIAÇÃO, quando
  * a despesa está sendo "lançada" a partir de uma
@@ -35,6 +37,8 @@ public record DespesaRequisicao(
 
         BigDecimal valorTotal,
 
+        BigDecimal desconto,
+
         @Valid
         List<ItemRequisicao> itens,
 
@@ -43,6 +47,8 @@ public record DespesaRequisicao(
 
         Long recorrenciaId,
 
-        LocalDate competencia
+        LocalDate competencia,
+
+        LocalDate dataPagamento
 ) {
 }

@@ -1,6 +1,7 @@
 package br.com.tetoproobra.despesa.web;
 
 import br.com.tetoproobra.despesa.aplicacao.DespesaServico;
+import br.com.tetoproobra.despesa.aplicacao.ImportacaoNfeServico;
 import br.com.tetoproobra.despesa.dominio.DespesaDocumento;
 import br.com.tetoproobra.despesa.infraestrutura.ArmazenamentoArquivoServico;
 import jakarta.validation.Valid;
@@ -39,6 +40,7 @@ public class DespesaController {
     private final DespesaServico servico;
     private final DespesaMapper mapper;
     private final ArmazenamentoArquivoServico armazenamentoArquivoServico;
+    private final ImportacaoNfeServico importacaoNfeServico;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','GESTOR','INVESTIDOR_VISUALIZADOR')")
@@ -73,6 +75,12 @@ public class DespesaController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void excluir(@PathVariable Long id) {
         servico.excluir(id);
+    }
+
+    @PostMapping("/importar-nfe")
+    @PreAuthorize("hasAnyRole('ADMIN','GESTOR')")
+    public ImportacaoNfeResposta importarNfe(@RequestParam("arquivo") MultipartFile arquivo) {
+        return importacaoNfeServico.importar(arquivo);
     }
 
     @PostMapping("/{id}/documentos")

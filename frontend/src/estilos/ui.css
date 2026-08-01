@@ -240,6 +240,27 @@
   gap: 16px;
   margin-bottom: 22px;
 }
+/* Cabeçalhos fixos da tela de cadastro/edição de despesa: o cabeçalho do
+   empreendimento (EmpreendimentoLayout) gruda no topo do scroll e o
+   cabeçalho da despesa (título + botões Salvar/Cancelar/Editar) gruda logo
+   abaixo dele — a altura do primeiro é publicada em
+   --altura-cabecalho-empreendimento via ResizeObserver (ver
+   EmpreendimentoLayout.tsx) para o segundo saber exatamente onde grudar. */
+.cabecalho-fixo {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: var(--bg);
+  padding-top: 4px;
+}
+.cabecalho-fixo-secundario {
+  position: sticky;
+  top: var(--altura-cabecalho-empreendimento, 92px);
+  z-index: 7;
+  background: var(--bg);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
 .titulo-pagina {
   font-size: 21px;
   font-weight: 700;
@@ -1106,5 +1127,35 @@ table.dados tbody tr:last-child td {
   }
   .grade-formulario {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- IMPRESSÃO DE RELATÓRIOS ---------- */
+.cabecalho-impressao {
+  display: none;
+}
+@media print {
+  .barra-lateral,
+  .topo,
+  .veu-menu,
+  .nao-imprimir {
+    display: none !important;
+  }
+  .layout-shell {
+    display: block;
+  }
+  .conteudo,
+  .conteudo-interno {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  .cabecalho-impressao {
+    display: block;
+    margin-bottom: 16px;
+  }
+  .painel {
+    box-shadow: none;
+    border: 1px solid #ccc;
+    break-inside: avoid;
   }
 }
