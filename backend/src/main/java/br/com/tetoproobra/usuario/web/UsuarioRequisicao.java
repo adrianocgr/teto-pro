@@ -14,6 +14,9 @@ public record UsuarioRequisicao(
         @NotBlank(message = "O nome é obrigatório")
         String nome,
 
+        @NotBlank(message = "O sobrenome é obrigatório")
+        String sobrenome,
+
         @NotBlank(message = "O username é obrigatório")
         String username,
 

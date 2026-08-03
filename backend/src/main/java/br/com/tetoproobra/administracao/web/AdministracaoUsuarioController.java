@@ -58,14 +58,14 @@ public class AdministracaoUsuarioController {
     @Operation(summary = "Vincula a pessoa a mais uma empresa")
     @PostMapping("/{id}/empresas")
     public UsuarioAdminResposta adicionarVinculo(@PathVariable Long id, @Valid @RequestBody VincularEmpresaRequisicao requisicao) {
-        return administracaoUsuarioServico.adicionarVinculo(id, requisicao.tenantId(), requisicao.papel());
+        return administracaoUsuarioServico.adicionarVinculo(id, requisicao.tenantId(), requisicao.papel(), requisicao.investidorId());
     }
 
     @Operation(summary = "Muda o papel da pessoa numa empresa à qual já está vinculada")
     @PutMapping("/{id}/empresas/{tenantId}")
     public UsuarioAdminResposta atualizarVinculo(@PathVariable Long id, @PathVariable String tenantId,
                                                    @Valid @RequestBody AtualizarPapelRequisicao requisicao) {
-        return administracaoUsuarioServico.atualizarVinculo(id, tenantId, requisicao.papel());
+        return administracaoUsuarioServico.atualizarVinculo(id, tenantId, requisicao.papel(), requisicao.investidorId());
     }
 
     @Operation(summary = "Remove o vínculo da pessoa com uma empresa")

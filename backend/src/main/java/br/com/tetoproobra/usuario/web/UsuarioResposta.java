@@ -10,6 +10,7 @@ public record UsuarioResposta(
         Long id,
         Long usuarioId,
         String nome,
+        String sobrenome,
         String username,
         String email,
         StatusAtivoInativo status,

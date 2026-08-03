@@ -14,6 +14,7 @@ export interface UsuarioResposta {
   id: number;
   usuarioId: number;
   nome: string;
+  sobrenome: string | null;
   username: string;
   email: string;
   status: 'ATIVO' | 'INATIVO';

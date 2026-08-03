@@ -2,6 +2,8 @@ package br.com.tetoproobra.administracao.web;
 
 import br.com.tetoproobra.administracao.aplicacao.EmpresaServico;
 import br.com.tetoproobra.administracao.dominio.Empresa;
+import br.com.tetoproobra.investidor.dominio.Investidor;
+import br.com.tetoproobra.investidor.web.InvestidorResposta;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -60,7 +62,18 @@ public class EmpresaController {
         return paraResposta(empresaServico.reativar(id));
     }
 
+    @Operation(summary = "Lista os investidores cadastrados numa empresa — usado para vincular um usuário com papel INVESTIDOR_VISUALIZADOR")
+    @GetMapping("/{id}/investidores")
+    public List<InvestidorResposta> listarInvestidores(@PathVariable String id) {
+        return empresaServico.listarInvestidores(id).stream().map(this::paraRespostaInvestidor).toList();
+    }
+
     private EmpresaResposta paraResposta(Empresa empresa) {
         return new EmpresaResposta(empresa.getId(), empresa.getNome(), empresa.getStatus());
+    }
+
+    private InvestidorResposta paraRespostaInvestidor(Investidor investidor) {
+        return new InvestidorResposta(investidor.getId(), investidor.getNome(), investidor.getCpfCnpj(),
+                investidor.getTipoPessoa(), investidor.getEmail(), investidor.getTelefone(), investidor.getObservacoes());
     }
 }

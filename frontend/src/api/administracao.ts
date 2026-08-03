@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cliente } from './cliente';
 import type { Papel } from '@/tipos/usuario';
+import type { InvestidorResposta } from './investidores';
 
 export interface EmpresaResposta {
   id: string;
@@ -23,6 +24,7 @@ export interface EmpresaVinculadaResposta {
 export interface UsuarioAdminResposta {
   id: number;
   nome: string;
+  sobrenome: string | null;
   username: string;
   email: string;
   status: 'ATIVO' | 'INATIVO';
@@ -32,18 +34,24 @@ export interface UsuarioAdminResposta {
 export interface UsuarioAdminRequisicao {
   tenantId: string;
   nome: string;
+  sobrenome: string;
   username: string;
   email: string;
   papel: Papel;
+  /** Obrigatório quando `papel` é INVESTIDOR_VISUALIZADOR. */
+  investidorId?: number | null;
 }
 export interface UsuarioAdminAtualizarRequisicao {
   nome: string;
+  sobrenome: string;
   username: string;
   email: string;
 }
 export interface VincularEmpresaRequisicao {
   tenantId: string;
   papel: Papel;
+  /** Obrigatório quando `papel` é INVESTIDOR_VISUALIZADOR. */
+  investidorId?: number | null;
 }
 
 // ---------- Empresas ----------
@@ -109,9 +117,14 @@ async function excluirUsuarioAdmin(id: number): Promise<void> {
 async function adicionarVinculo(id: number, dados: VincularEmpresaRequisicao): Promise<UsuarioAdminResposta> {
   return cliente.post<UsuarioAdminResposta>(`/administracao/usuarios/${id}/empresas`, dados).then((r) => r.data);
 }
-async function atualizarVinculo(id: number, tenantId: string, papel: Papel): Promise<UsuarioAdminResposta> {
+async function atualizarVinculo(
+  id: number,
+  tenantId: string,
+  papel: Papel,
+  investidorId?: number | null,
+): Promise<UsuarioAdminResposta> {
   return cliente
-    .put<UsuarioAdminResposta>(`/administracao/usuarios/${id}/empresas/${tenantId}`, { papel })
+    .put<UsuarioAdminResposta>(`/administracao/usuarios/${id}/empresas/${tenantId}`, { papel, investidorId })
     .then((r) => r.data);
 }
 async function removerVinculo(id: number, tenantId: string): Promise<UsuarioAdminResposta> {
@@ -156,8 +169,17 @@ export function useAdicionarVinculo() {
 export function useAtualizarVinculo() {
   const filaConsulta = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, tenantId, papel }: { id: number; tenantId: string; papel: Papel }) =>
-      atualizarVinculo(id, tenantId, papel),
+    mutationFn: ({
+      id,
+      tenantId,
+      papel,
+      investidorId,
+    }: {
+      id: number;
+      tenantId: string;
+      papel: Papel;
+      investidorId?: number | null;
+    }) => atualizarVinculo(id, tenantId, papel, investidorId),
     onSuccess: () => filaConsulta.invalidateQueries({ queryKey: ['administracao', 'usuarios'] }),
   });
 }
@@ -166,5 +188,20 @@ export function useRemoverVinculo() {
   return useMutation({
     mutationFn: ({ id, tenantId }: { id: number; tenantId: string }) => removerVinculo(id, tenantId),
     onSuccess: () => filaConsulta.invalidateQueries({ queryKey: ['administracao', 'usuarios'] }),
+  });
+}
+
+// ---------- Investidores (por empresa, visão de administração) ----------
+
+async function listarInvestidoresDaEmpresa(tenantId: string): Promise<InvestidorResposta[]> {
+  return cliente.get<InvestidorResposta[]>(`/administracao/empresas/${tenantId}/investidores`).then((r) => r.data);
+}
+
+/** Usado para popular o seletor de investidor ao vincular alguém com papel INVESTIDOR_VISUALIZADOR. */
+export function useListaInvestidoresDaEmpresa(tenantId: string | undefined) {
+  return useQuery({
+    queryKey: ['administracao', 'investidores', tenantId ?? ''],
+    queryFn: () => listarInvestidoresDaEmpresa(tenantId as string),
+    enabled: !!tenantId,
   });
 }

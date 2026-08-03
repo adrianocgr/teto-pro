@@ -51,7 +51,8 @@ public class UsuarioServico {
     public UsuarioResposta criar(UsuarioRequisicao requisicao) {
         String tenantId = ContextoTenant.obter();
         Investidor investidor = resolverInvestidor(requisicao.papel(), requisicao.investidorId());
-        Usuario usuario = provisionamentoServico.obterOuProvisionar(requisicao.nome(), requisicao.username(), requisicao.email());
+        Usuario usuario = provisionamentoServico.obterOuProvisionar(
+                requisicao.nome(), requisicao.sobrenome(), requisicao.username(), requisicao.email());
 
         if (vinculoRepository.existsByUsuario_IdAndTenantId(usuario.getId(), tenantId)) {
             throw new RegraDeNegocioException("Este usuário já está vinculado a esta empresa");
@@ -80,6 +81,7 @@ public class UsuarioServico {
         }
 
         usuario.setNome(requisicao.nome());
+        usuario.setSobrenome(requisicao.sobrenome());
         usuario.setUsername(requisicao.username());
         usuario.setEmail(requisicao.email());
         usuarioRepository.save(usuario);
@@ -121,6 +123,7 @@ public class UsuarioServico {
                 vinculo.getId(),
                 usuario.getId(),
                 usuario.getNome(),
+                usuario.getSobrenome(),
                 usuario.getUsername(),
                 usuario.getEmail(),
                 vinculo.getStatus(),

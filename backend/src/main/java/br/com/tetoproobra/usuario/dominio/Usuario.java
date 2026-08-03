@@ -46,6 +46,15 @@ public class Usuario {
     @Column(name = "us_nome", nullable = false)
     private String nome;
 
+    /**
+     * Sobrenome — opcional na coluna (contas antigas foram criadas só com
+     * {@code nome}), mas exigido pela API do formulário de cadastro porque o
+     * Keycloak recusa a criação do usuário sem {@code lastName} (perfil de
+     * usuário padrão do realm exige o atributo).
+     */
+    @Column(name = "us_sobrenome", length = 120)
+    private String sobrenome;
+
     @Column(name = "us_username", nullable = false, length = 60)
     private String username;
 

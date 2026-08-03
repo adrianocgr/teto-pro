@@ -25,7 +25,7 @@ public class UsuarioProvisionamentoServico {
     private final UsuarioRepository usuarioRepository;
     private final KeycloakAdminClient keycloakAdminClient;
 
-    public Usuario obterOuProvisionar(String nome, String username, String email) {
+    public Usuario obterOuProvisionar(String nome, String sobrenome, String username, String email) {
         Usuario existentePorEmail = usuarioRepository.findByEmailIgnoreCase(email).orElse(null);
         if (existentePorEmail != null) {
             if (!existentePorEmail.getUsername().equalsIgnoreCase(username)) {
@@ -40,9 +40,10 @@ public class UsuarioProvisionamentoServico {
             throw new RegraDeNegocioException("Já existe um usuário cadastrado com este nome de acesso, mas com outro e-mail");
         }
 
-        String keycloakId = keycloakAdminClient.criarUsuario(nome, username, email);
+        String keycloakId = keycloakAdminClient.criarUsuario(nome, sobrenome, username, email);
         Usuario novoUsuario = Usuario.builder()
                 .nome(nome)
+                .sobrenome(sobrenome)
                 .username(username)
                 .email(email)
                 .status(StatusAtivoInativo.ATIVO)

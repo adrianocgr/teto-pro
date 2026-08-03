@@ -1,0 +1,247 @@
+/* =========================================================
+   TetoPro Obra — tema de login do Keycloak
+   Reaproveita a mesma paleta/identidade do app (ver
+   frontend/src/estilos/global.css e ui.css) em cima do tema
+   clássico "keycloak" (PatternFly 4 / login-pf).
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --tp-marca: #142140;
+  --tp-marca-2: #1d3057;
+  --tp-marca-contraste: #f8f4ea;
+  --tp-bg: #f6f3ec;
+  --tp-surface: #ffffff;
+  --tp-surface-2: #eee7d8;
+  --tp-border: #e4dcca;
+  --tp-border-strong: #d3c8b2;
+  --tp-ink: #191f30;
+  --tp-ink-2: #4b5468;
+  --tp-ink-muted: #838da0;
+  --tp-gold: #97672a;
+  --tp-gold-fill: #d09b3e;
+  --tp-focus: #235fae;
+  --tp-critical: #bd2f2f;
+  --tp-good: #157a2e;
+}
+
+html {
+  height: 100%;
+}
+
+body,
+body.login-pf {
+  height: 100%;
+  margin: 0;
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif !important;
+  color: var(--tp-ink);
+  background: var(--tp-bg) !important;
+  background-image: none !important;
+}
+
+/* O tema clássico usa um degradê escuro de fundo por padrão — substitui por
+   um painel dividido: metade navê (marca) à esquerda, metade bege (bg) à
+   direita, com o cartão de login flutuando por cima. Em telas estreitas o
+   navy vira só uma faixa no topo. */
+body.login-pf::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(120deg, var(--tp-marca) 0%, var(--tp-marca-2) 45%, var(--tp-bg) 45%, var(--tp-bg) 100%);
+  z-index: -1;
+}
+@media (max-width: 900px) {
+  body.login-pf::before {
+    background: linear-gradient(180deg, var(--tp-marca) 0%, var(--tp-marca-2) 220px, var(--tp-bg) 220px, var(--tp-bg) 100%);
+  }
+}
+
+/* O tema base posiciona o cartão via grid/offset do Bootstrap — como
+   estreitamos o cartão (max-width abaixo), aquele offset percentual passa a
+   sobrar espaço só do lado direito, empurrando tudo pra esquerda. Forçando
+   flexbox aqui ignoramos esse float/offset herdado e centralizamos de
+   verdade, na largura toda da página. */
+html,
+body.login-pf {
+  width: 100%;
+}
+.login-pf-page {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center !important;
+  width: 100%;
+  min-height: 100vh;
+  padding-top: 6vh;
+  box-sizing: border-box;
+}
+.login-pf-page > *,
+#kc-content,
+#kc-content-wrapper {
+  float: none !important;
+  width: auto !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+#kc-header-wrapper {
+  color: var(--tp-marca-contraste);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  text-align: center;
+  text-shadow: none;
+  margin-bottom: 4px;
+}
+#kc-header-wrapper b,
+#kc-header-wrapper strong {
+  color: var(--tp-gold-fill);
+}
+
+.login-pf-page .login-pf-brand,
+#kc-header {
+  margin-bottom: 22px;
+}
+
+/* Cartão branco com o formulário — mesma linguagem visual dos ".painel" do app. */
+.login-pf-page .card-pf,
+#kc-content-wrapper .card-pf,
+.login-pf-page-header + #kc-content-wrapper .card-pf {
+  background: var(--tp-surface);
+  border: 1px solid var(--tp-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(20, 33, 64, 0.16), 0 2px 6px rgba(20, 33, 64, 0.08);
+  padding: 34px 30px;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto !important;
+  float: none !important;
+}
+
+#kc-page-title {
+  color: var(--tp-ink);
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+label,
+.control-label {
+  color: var(--tp-ink-2) !important;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.form-control {
+  border: 1px solid var(--tp-border-strong) !important;
+  border-radius: 8px !important;
+  padding: 10px 12px !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  height: auto !important;
+  color: var(--tp-ink) !important;
+  background: var(--tp-surface) !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
+.form-control:focus {
+  outline: 2px solid var(--tp-focus);
+  outline-offset: 0;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.checkbox label,
+#kc-form-options,
+#kc-form-options span {
+  color: var(--tp-ink-muted);
+  font-size: 12.5px;
+}
+
+.btn-primary,
+input[type='submit'].btn-primary,
+#kc-login {
+  background: var(--tp-marca) !important;
+  border-color: var(--tp-marca) !important;
+  color: var(--tp-marca-contraste) !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  border-radius: 8px !important;
+  padding: 10px 16px !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background: var(--tp-marca-2) !important;
+  border-color: var(--tp-marca-2) !important;
+}
+.btn-primary:focus-visible {
+  outline: 2px solid var(--tp-gold-fill);
+  outline-offset: 2px;
+}
+
+a,
+a:link,
+a:visited {
+  color: var(--tp-focus);
+  text-decoration: none;
+}
+a:hover,
+a:focus {
+  color: var(--tp-marca);
+  text-decoration: underline;
+}
+
+#kc-registration,
+#kc-info,
+.login-pf-signup {
+  color: var(--tp-ink-muted);
+  font-size: 13px;
+}
+
+.alert {
+  border-radius: 8px;
+  border-width: 1px;
+  border-style: solid;
+  font-size: 13px;
+}
+.alert-error,
+.alert.alert-error,
+.alert-danger {
+  background: color-mix(in oklab, var(--tp-critical) 10%, white);
+  border-color: var(--tp-critical);
+  color: var(--tp-critical);
+}
+.alert-warning {
+  background: color-mix(in oklab, var(--tp-gold-fill) 14%, white);
+  border-color: var(--tp-gold-fill);
+  color: var(--tp-gold);
+}
+.alert-success {
+  background: color-mix(in oklab, var(--tp-good) 10%, white);
+  border-color: var(--tp-good);
+  color: var(--tp-good);
+}
+
+#kc-locale {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+}
+#kc-locale-dropdown a,
+#kc-locale-dropdown button {
+  color: var(--tp-marca-contraste);
+}
+
+::selection {
+  background: var(--tp-gold-fill);
+  color: var(--tp-marca);
+}
+
+#kc-info-wrapper {
+  color: var(--tp-marca-contraste);
+  text-align: center;
+  font-size: 12px;
+}

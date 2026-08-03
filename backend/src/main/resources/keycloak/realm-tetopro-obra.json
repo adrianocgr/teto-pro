@@ -5,6 +5,15 @@
   "registrationAllowed": false,
   "accessTokenLifespan": 1800,
 
+  "displayName": "TetoPro Obra",
+  "displayNameHtml": "Teto<b>Pro</b> Obra",
+  "loginTheme": "tetopro-obra",
+  "accountTheme": "tetopro-obra",
+
+  "internationalizationEnabled": true,
+  "supportedLocales": ["pt-BR"],
+  "defaultLocale": "pt-BR",
+
   "roles": {
     "realm": [
       { "name": "ADMIN", "description": "Acesso total: gerencia empreendimentos, investidores e usuários" },

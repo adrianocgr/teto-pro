@@ -5,12 +5,20 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-/** Cadastra a pessoa (se ainda não existir) e cria seu primeiro vínculo com uma empresa. */
+/**
+ * Cadastra a pessoa (se ainda não existir) e cria seu primeiro vínculo com uma empresa.
+ * <p>
+ * {@code investidorId} só é relevante (e obrigatório) quando {@code papel} é
+ * {@link Papel#INVESTIDOR_VISUALIZADOR} — validado em
+ * {@link br.com.tetoproobra.administracao.aplicacao.AdministracaoUsuarioServico}, não via Bean Validation.
+ */
 public record UsuarioAdminRequisicao(
         @NotBlank(message = "Selecione a empresa") String tenantId,
         @NotBlank(message = "Informe o nome") String nome,
+        @NotBlank(message = "Informe o sobrenome") String sobrenome,
         @NotBlank(message = "Informe o usuário de acesso") String username,
         @NotBlank @Email(message = "Informe um e-mail válido") String email,
-        @NotNull(message = "Selecione o papel do usuário") Papel papel
+        @NotNull(message = "Selecione o papel do usuário") Papel papel,
+        Long investidorId
 ) {
 }

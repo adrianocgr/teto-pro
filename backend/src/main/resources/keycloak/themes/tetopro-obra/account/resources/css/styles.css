@@ -1,0 +1,92 @@
+/* =========================================================
+   TetoPro Obra — tema do Account Console (Personal info, Signing in ⁄
+   trocar senha, Device activity...). O console novo é uma SPA em
+   React/PatternFly; aqui sobrepomos as CSS custom properties globais do
+   PatternFly (cascam para praticamente todo componente — botões, links,
+   navegação, foco) em vez de perseguir classe por classe, mais resiliente
+   a mudanças de versão do PatternFly entre releases do Keycloak.
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+:root,
+.pf-v5-theme-dark {
+  --tp-marca: #142140;
+  --tp-marca-2: #1d3057;
+  --tp-marca-contraste: #f8f4ea;
+  --tp-bg: #f6f3ec;
+  --tp-surface: #ffffff;
+  --tp-border: #e4dcca;
+  --tp-ink: #191f30;
+  --tp-gold-fill: #d09b3e;
+  --tp-focus: #235fae;
+
+  /* PatternFly v5 (Account Console novo) */
+  --pf-v5-global--primary-color--100: var(--tp-marca);
+  --pf-v5-global--primary-color--200: var(--tp-marca-2);
+  --pf-v5-global--link--Color: var(--tp-focus);
+  --pf-v5-global--link--Color--hover: var(--tp-marca);
+  --pf-v5-global--active-color--100: var(--tp-marca);
+  --pf-v5-global--BackgroundColor--dark-100: var(--tp-marca);
+  --pf-v5-global--BackgroundColor--dark-200: var(--tp-marca-2);
+
+  /* PatternFly v6 (caso o Keycloak em uso já tenha migrado) */
+  --pf-t--global--color--brand--default: var(--tp-marca);
+  --pf-t--global--color--brand--hover: var(--tp-marca-2);
+  --pf-t--global--background--color--primary--default: var(--tp-marca);
+  --pf-t--global--text--color--link--default: var(--tp-focus);
+}
+
+body {
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif !important;
+  background: var(--tp-bg) !important;
+}
+
+/* Barra superior (masthead) com a marca do produto */
+.pf-v5-c-masthead,
+header.pf-v5-c-page__header {
+  background: var(--tp-marca) !important;
+}
+.pf-v5-c-masthead * {
+  color: var(--tp-marca-contraste) !important;
+}
+
+/* Navegação lateral */
+.pf-v5-c-nav__link.pf-m-current,
+.pf-v5-c-nav__link[aria-current='page'] {
+  color: var(--tp-marca) !important;
+  font-weight: 600;
+}
+.pf-v5-c-nav__link.pf-m-current::before {
+  background-color: var(--tp-gold-fill) !important;
+}
+
+/* Botões primários (Salvar, Atualizar senha...) */
+.pf-v5-c-button.pf-m-primary {
+  background-color: var(--tp-marca) !important;
+  border-color: var(--tp-marca) !important;
+}
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-v5-c-button.pf-m-primary:focus {
+  background-color: var(--tp-marca-2) !important;
+}
+.pf-v5-c-button.pf-m-link {
+  color: var(--tp-focus) !important;
+}
+
+a {
+  color: var(--tp-focus);
+}
+a:hover {
+  color: var(--tp-marca);
+}
+
+.pf-v5-c-card {
+  border: 1px solid var(--tp-border);
+  border-radius: 12px !important;
+}
+
+::selection {
+  background: var(--tp-gold-fill);
+  color: var(--tp-marca);
+}

@@ -426,6 +426,16 @@
   flex-shrink: 0;
   white-space: nowrap;
 }
+/* Variante para chips de vínculo empresa/papel (coluna "Empresas" de
+   Usuarios.tsx) — ao contrário do badge curto de status ("ATIVO"), o texto
+   aqui pode ser longo (nome da empresa + papel) e precisa poder quebrar
+   linha DENTRO do próprio chip; sem isso, um chip mais largo que o
+   container ultrapassa a coluna e sobrepõe a coluna vizinha (Status). */
+.pilula-vinculo {
+  white-space: normal;
+  text-align: left;
+  max-width: 100%;
+}
 .pilula-status .ponto {
   width: 6px;
   height: 6px;

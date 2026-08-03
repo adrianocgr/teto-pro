@@ -50,12 +50,18 @@ public class KeycloakAdminClient {
      * Cria o usuário no Keycloak com uma senha temporária padrão (o próprio
      * Keycloak força a troca no primeiro login, por causa de "temporary": true)
      * e devolve o id gerado — que vira {@code us_keycloak_id} em {@code tb_usuario}.
+     * <p>
+     * {@code lastName} é obrigatório aqui: o perfil de usuário padrão do
+     * realm (declarative user profile do Keycloak) exige tanto
+     * {@code firstName} quanto {@code lastName} — sem o sobrenome, a Admin
+     * REST API rejeita a criação com "Please specify last name.".
      */
-    public String criarUsuario(String nome, String username, String email) {
+    public String criarUsuario(String nome, String sobrenome, String username, String email) {
         Map<String, Object> corpo = Map.of(
                 "username", username,
                 "email", email,
                 "firstName", nome,
+                "lastName", sobrenome,
                 "enabled", true,
                 "emailVerified", true,
                 "credentials", List.of(Map.of(

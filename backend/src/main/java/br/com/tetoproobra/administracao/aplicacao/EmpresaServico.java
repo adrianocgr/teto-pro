@@ -5,7 +5,11 @@ import br.com.tetoproobra.administracao.infraestrutura.EmpresaRepository;
 import br.com.tetoproobra.compartilhado.dominio.StatusAtivoInativo;
 import br.com.tetoproobra.compartilhado.dominio.excecoes.RecursoNaoEncontradoException;
 import br.com.tetoproobra.compartilhado.dominio.excecoes.RegraDeNegocioException;
+import br.com.tetoproobra.compartilhado.multitenancy.ContextoTenant;
+import br.com.tetoproobra.investidor.dominio.Investidor;
+import br.com.tetoproobra.investidor.infraestrutura.InvestidorRepository;
 import java.text.Normalizer;
+import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +25,7 @@ import org.springframework.stereotype.Service;
 public class EmpresaServico {
 
     private final EmpresaRepository empresaRepository;
+    private final InvestidorRepository investidorRepository;
 
     public List<Empresa> listar() {
         return empresaRepository.findAll();
@@ -53,6 +58,26 @@ public class EmpresaServico {
         Empresa empresa = buscarPorId(id);
         empresa.setStatus(StatusAtivoInativo.ATIVO);
         return empresaRepository.save(empresa);
+    }
+
+    /**
+     * Investidores cadastrados nesta empresa — usado para popular o seletor
+     * de investidor ao vincular uma pessoa com papel INVESTIDOR_VISUALIZADOR
+     * (ver AdministracaoUsuarioServico). {@link Investidor} é isolado por
+     * tenant, e este serviço roda sem {@link ContextoTenant} definido (visão
+     * "de cima" do PLATAFORMA_ADMIN) — por isso publicamos o tenant só para
+     * esta consulta.
+     */
+    public List<Investidor> listarInvestidores(String tenantId) {
+        buscarPorId(tenantId);
+        ContextoTenant.definir(tenantId);
+        try {
+            return investidorRepository.findAll().stream()
+                    .sorted(Comparator.comparing(Investidor::getNome, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+        } finally {
+            ContextoTenant.limpar();
+        }
     }
 
     private String gerarIdUnico(String nome) {

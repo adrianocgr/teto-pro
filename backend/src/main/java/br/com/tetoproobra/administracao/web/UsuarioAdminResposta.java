@@ -9,6 +9,7 @@ import java.util.List;
 public record UsuarioAdminResposta(
         Long id,
         String nome,
+        String sobrenome,
         String username,
         String email,
         StatusAtivoInativo status,

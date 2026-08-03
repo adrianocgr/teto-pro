@@ -11,6 +11,7 @@ import {
   useAdicionarVinculo,
   useAtualizarVinculo,
   useRemoverVinculo,
+  useListaInvestidoresDaEmpresa,
   type UsuarioAdminResposta,
 } from '@/api/administracao';
 import type { Papel } from '@/tipos/usuario';
@@ -28,13 +29,24 @@ function rotuloPapel(papel: Papel) {
 interface FormularioUsuario {
   tenantId: string;
   nome: string;
+  sobrenome: string;
   username: string;
   email: string;
   papel: Papel;
+  /** Só é usado (e obrigatório) quando `papel` é INVESTIDOR_VISUALIZADOR. */
+  investidorId: string;
 }
 
 function formularioVazio(tenantIdPadrao: string): FormularioUsuario {
-  return { tenantId: tenantIdPadrao, nome: '', username: '', email: '', papel: 'GESTOR' };
+  return {
+    tenantId: tenantIdPadrao,
+    nome: '',
+    sobrenome: '',
+    username: '',
+    email: '',
+    papel: 'GESTOR',
+    investidorId: '',
+  };
 }
 
 export function Usuarios() {
@@ -58,6 +70,8 @@ export function Usuarios() {
   const [vinculoEmEdicao, setVinculoEmEdicao] = useState<string | null>(null); // tenantId, quando é edição de papel
   const [empresaEscolhida, setEmpresaEscolhida] = useState('');
   const [papelEscolhido, setPapelEscolhido] = useState<Papel>('GESTOR');
+  const [investidorEscolhido, setInvestidorEscolhido] = useState('');
+  const { data: investidoresDaEmpresaEscolhida } = useListaInvestidoresDaEmpresa(empresaEscolhida || undefined);
 
   function abrirNovoUsuario() {
     setUsuarioEmEdicao(null);
@@ -67,9 +81,31 @@ export function Usuarios() {
 
   function abrirEdicao(usuario: UsuarioAdminResposta) {
     setUsuarioEmEdicao(usuario);
-    setFormulario({ tenantId: '', nome: usuario.nome, username: usuario.username, email: usuario.email, papel: 'GESTOR' });
+    const vinculoUnico = usuario.empresas.length === 1 ? usuario.empresas[0] : null;
+    setFormulario({
+      tenantId: '',
+      nome: usuario.nome,
+      sobrenome: usuario.sobrenome ?? '',
+      username: usuario.username,
+      email: usuario.email,
+      papel: vinculoUnico?.papel ?? 'GESTOR',
+      investidorId: vinculoUnico?.investidorId ? String(vinculoUnico.investidorId) : '',
+    });
     setModalAberto(true);
   }
+
+  // Papel é um dado do VÍNCULO com a empresa, não da pessoa — só dá pra
+  // editá-lo direto no modal de "Editar usuário" quando há um único vínculo
+  // (sem ambiguidade sobre qual empresa). Com múltiplos vínculos (ou nenhum),
+  // a edição continua pelo chip de empresa na listagem (abrirVinculoEdicao).
+  const vinculoUnicoEmEdicao =
+    usuarioEmEdicao && usuarioEmEdicao.empresas.length === 1 ? usuarioEmEdicao.empresas[0] : null;
+
+  // Empresa "dona" do papel sendo editado no modal de usuário — a empresa
+  // recém-selecionada (criação) ou a do vínculo único (edição). Usada para
+  // buscar os investidores disponíveis quando o papel é INVESTIDOR_VISUALIZADOR.
+  const tenantIdDoPapelEmEdicao = usuarioEmEdicao ? (vinculoUnicoEmEdicao?.tenantId ?? '') : formulario.tenantId;
+  const { data: investidoresDaEmpresa } = useListaInvestidoresDaEmpresa(tenantIdDoPapelEmEdicao || undefined);
 
   function atualizarCampo(campo: keyof FormularioUsuario, valor: string) {
     setFormulario((atual) => ({ ...atual, [campo]: valor }));
@@ -77,18 +113,64 @@ export function Usuarios() {
 
   function aoSalvar(evento: FormEvent) {
     evento.preventDefault();
-    if (!formulario.nome.trim() || !formulario.username.trim() || !formulario.email.trim()) return;
+    if (
+      !formulario.nome.trim() ||
+      !formulario.sobrenome.trim() ||
+      !formulario.username.trim() ||
+      !formulario.email.trim()
+    )
+      return;
+
+    // O papel só é editável aqui na criação, ou na edição quando há um único
+    // vínculo (ver vinculoUnicoEmEdicao) — nesses casos, INVESTIDOR_VISUALIZADOR
+    // exige um investidor selecionado (é o que faltava e quebrava o acesso do
+    // investidor: vínculo sem investidor associado).
+    const papelEditavelAgora = !usuarioEmEdicao || !!vinculoUnicoEmEdicao;
+    if (papelEditavelAgora && formulario.papel === 'INVESTIDOR_VISUALIZADOR' && !formulario.investidorId) {
+      notificar('Selecione o investidor correspondente a este usuário', 'erro');
+      return;
+    }
 
     if (usuarioEmEdicao) {
+      const usuarioId = usuarioEmEdicao.id;
       atualizar.mutate(
         {
-          id: usuarioEmEdicao.id,
-          dados: { nome: formulario.nome.trim(), username: formulario.username.trim(), email: formulario.email.trim() },
+          id: usuarioId,
+          dados: {
+            nome: formulario.nome.trim(),
+            sobrenome: formulario.sobrenome.trim(),
+            username: formulario.username.trim(),
+            email: formulario.email.trim(),
+          },
         },
         {
           onSuccess: () => {
-            notificar('Usuário atualizado com sucesso');
-            setModalAberto(false);
+            const papelMudou = vinculoUnicoEmEdicao && vinculoUnicoEmEdicao.papel !== formulario.papel;
+            const investidorMudou =
+              vinculoUnicoEmEdicao &&
+              formulario.papel === 'INVESTIDOR_VISUALIZADOR' &&
+              String(vinculoUnicoEmEdicao.investidorId ?? '') !== formulario.investidorId;
+
+            if (vinculoUnicoEmEdicao && (papelMudou || investidorMudou)) {
+              atualizarVinculo.mutate(
+                {
+                  id: usuarioId,
+                  tenantId: vinculoUnicoEmEdicao.tenantId,
+                  papel: formulario.papel,
+                  investidorId: formulario.investidorId ? Number(formulario.investidorId) : null,
+                },
+                {
+                  onSuccess: () => {
+                    notificar('Usuário atualizado com sucesso');
+                    setModalAberto(false);
+                  },
+                  onError: () => notificar('Dados salvos, mas não foi possível atualizar o papel', 'erro'),
+                },
+              );
+            } else {
+              notificar('Usuário atualizado com sucesso');
+              setModalAberto(false);
+            }
           },
           onError: () => notificar('Não foi possível atualizar o usuário', 'erro'),
         },
@@ -99,7 +181,14 @@ export function Usuarios() {
         return;
       }
       criar.mutate(
-        { ...formulario, nome: formulario.nome.trim(), username: formulario.username.trim(), email: formulario.email.trim() },
+        {
+          ...formulario,
+          nome: formulario.nome.trim(),
+          sobrenome: formulario.sobrenome.trim(),
+          username: formulario.username.trim(),
+          email: formulario.email.trim(),
+          investidorId: formulario.investidorId ? Number(formulario.investidorId) : null,
+        },
         {
           onSuccess: () => {
             notificar('Usuário cadastrado com sucesso — senha temporária padrão enviada no Keycloak');
@@ -125,22 +214,30 @@ export function Usuarios() {
     const jaVinculadas = new Set(usuario.empresas.map((e) => e.tenantId));
     setEmpresaEscolhida((empresas ?? []).find((e) => !jaVinculadas.has(e.id))?.id ?? '');
     setPapelEscolhido('GESTOR');
+    setInvestidorEscolhido('');
   }
 
-  function abrirVinculoEdicao(usuario: UsuarioAdminResposta, tenantId: string, papelAtual: Papel) {
+  function abrirVinculoEdicao(usuario: UsuarioAdminResposta, tenantId: string, papelAtual: Papel, investidorIdAtual: number | null) {
     setModalVinculo(usuario);
     setVinculoEmEdicao(tenantId);
     setEmpresaEscolhida(tenantId);
     setPapelEscolhido(papelAtual);
+    setInvestidorEscolhido(investidorIdAtual ? String(investidorIdAtual) : '');
   }
 
   function aoSalvarVinculo(evento: FormEvent) {
     evento.preventDefault();
     if (!modalVinculo) return;
 
+    if (papelEscolhido === 'INVESTIDOR_VISUALIZADOR' && !investidorEscolhido) {
+      notificar('Selecione o investidor correspondente a este usuário', 'erro');
+      return;
+    }
+    const investidorId = investidorEscolhido ? Number(investidorEscolhido) : null;
+
     if (vinculoEmEdicao) {
       atualizarVinculo.mutate(
-        { id: modalVinculo.id, tenantId: vinculoEmEdicao, papel: papelEscolhido },
+        { id: modalVinculo.id, tenantId: vinculoEmEdicao, papel: papelEscolhido, investidorId },
         {
           onSuccess: () => {
             notificar('Papel atualizado com sucesso');
@@ -155,7 +252,7 @@ export function Usuarios() {
         return;
       }
       adicionarVinculo.mutate(
-        { id: modalVinculo.id, dados: { tenantId: empresaEscolhida, papel: papelEscolhido } },
+        { id: modalVinculo.id, dados: { tenantId: empresaEscolhida, papel: papelEscolhido, investidorId } },
         {
           onSuccess: () => {
             notificar('Usuário vinculado à empresa com sucesso');
@@ -224,26 +321,28 @@ export function Usuarios() {
               <tbody>
                 {(usuarios ?? []).map((usuario) => (
                   <tr key={usuario.id}>
-                    <td style={{ fontWeight: 600 }}>{usuario.nome}</td>
-                    <td>
+                    <td style={{ fontWeight: 600, verticalAlign: 'top' }}>
+                      {usuario.nome} {usuario.sobrenome ?? ''}
+                    </td>
+                    <td style={{ verticalAlign: 'top' }}>
                       <div>{usuario.username}</div>
                       <div style={{ fontSize: 11.5, color: 'var(--ink-muted)' }}>{usuario.email}</div>
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxWidth: 320 }}>
+                    <td style={{ verticalAlign: 'top', maxWidth: 320 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {usuario.empresas.map((vinculo) => (
                           <span
                             key={vinculo.tenantId}
-                            className="pilula-status status-ativo"
+                            className="pilula-status status-ativo pilula-vinculo"
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                             title="Clique para editar o papel"
-                            onClick={() => abrirVinculoEdicao(usuario, vinculo.tenantId, vinculo.papel)}
+                            onClick={() => abrirVinculoEdicao(usuario, vinculo.tenantId, vinculo.papel, vinculo.investidorId)}
                           >
                             {vinculo.tenantNome} · {rotuloPapel(vinculo.papel)}
                             <button
                               type="button"
                               aria-label="Remover vínculo"
-                              style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                              style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, lineHeight: 1, flexShrink: 0 }}
                               onClick={(evento) => {
                                 evento.stopPropagation();
                                 aoRemoverVinculo(usuario, vinculo.tenantId, vinculo.tenantNome);
@@ -258,14 +357,14 @@ export function Usuarios() {
                         )}
                       </div>
                     </td>
-                    <td>
+                    <td style={{ verticalAlign: 'top' }}>
                       <span className={`pilula-status ${usuario.status === 'ATIVO' ? 'status-ativo' : 'status-inativo'}`}>
                         <span className="ponto" />
                         {usuario.status}
                       </span>
                     </td>
-                    <td>{formatarData(usuario.createdAt.slice(0, 10))}</td>
-                    <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <td style={{ verticalAlign: 'top' }}>{formatarData(usuario.createdAt.slice(0, 10))}</td>
+                    <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap', verticalAlign: 'top' }}>
                       <button className="botao botao-fantasma botao-pequeno" onClick={() => abrirEdicao(usuario)}>
                         Editar
                       </button>
@@ -312,7 +411,9 @@ export function Usuarios() {
                       <select
                         id="campo-empresa"
                         value={formulario.tenantId}
-                        onChange={(e) => atualizarCampo('tenantId', e.target.value)}
+                        onChange={(e) =>
+                          setFormulario((atual) => ({ ...atual, tenantId: e.target.value, investidorId: '' }))
+                        }
                       >
                         <option value="">Selecione…</option>
                         {(empresas ?? []).map((empresa) => (
@@ -323,13 +424,22 @@ export function Usuarios() {
                       </select>
                     </div>
                   )}
-                  <div className="campo col-2">
+                  <div className="campo">
                     <label htmlFor="campo-nome-usuario">Nome</label>
                     <input
                       id="campo-nome-usuario"
                       type="text"
                       value={formulario.nome}
                       onChange={(e) => atualizarCampo('nome', e.target.value)}
+                    />
+                  </div>
+                  <div className="campo">
+                    <label htmlFor="campo-sobrenome-usuario">Sobrenome</label>
+                    <input
+                      id="campo-sobrenome-usuario"
+                      type="text"
+                      value={formulario.sobrenome}
+                      onChange={(e) => atualizarCampo('sobrenome', e.target.value)}
                     />
                   </div>
                   <div className="campo">
@@ -350,20 +460,54 @@ export function Usuarios() {
                       onChange={(e) => atualizarCampo('email', e.target.value)}
                     />
                   </div>
-                  {!usuarioEmEdicao && (
+                  {!usuarioEmEdicao || vinculoUnicoEmEdicao ? (
+                    <>
+                      <div className={formulario.papel === 'INVESTIDOR_VISUALIZADOR' ? 'campo' : 'campo col-2'}>
+                        <label htmlFor="campo-papel">
+                          {vinculoUnicoEmEdicao ? `Papel em ${vinculoUnicoEmEdicao.tenantNome}` : 'Papel'}
+                        </label>
+                        <select
+                          id="campo-papel"
+                          value={formulario.papel}
+                          onChange={(e) =>
+                            setFormulario((atual) => ({ ...atual, papel: e.target.value as Papel, investidorId: '' }))
+                          }
+                        >
+                          {PAPEIS.map((p) => (
+                            <option key={p.valor} value={p.valor}>
+                              {p.rotulo}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {formulario.papel === 'INVESTIDOR_VISUALIZADOR' && (
+                        <div className="campo">
+                          <label htmlFor="campo-investidor">Investidor</label>
+                          <select
+                            id="campo-investidor"
+                            value={formulario.investidorId}
+                            disabled={!tenantIdDoPapelEmEdicao}
+                            onChange={(e) => atualizarCampo('investidorId', e.target.value)}
+                          >
+                            <option value="">Selecione…</option>
+                            {(investidoresDaEmpresa ?? []).map((investidor) => (
+                              <option key={investidor.id} value={investidor.id}>
+                                {investidor.nome}
+                              </option>
+                            ))}
+                          </select>
+                          {!tenantIdDoPapelEmEdicao && <div className="dica">Selecione a empresa primeiro.</div>}
+                        </div>
+                      )}
+                    </>
+                  ) : (
                     <div className="campo col-2">
-                      <label htmlFor="campo-papel">Papel</label>
-                      <select
-                        id="campo-papel"
-                        value={formulario.papel}
-                        onChange={(e) => atualizarCampo('papel', e.target.value)}
-                      >
-                        {PAPEIS.map((p) => (
-                          <option key={p.valor} value={p.valor}>
-                            {p.rotulo}
-                          </option>
-                        ))}
-                      </select>
+                      <label>Papel</label>
+                      <div className="dica">
+                        {usuarioEmEdicao.empresas.length === 0
+                          ? 'Este usuário ainda não está vinculado a nenhuma empresa — use "+ Vincular empresa" para definir o papel.'
+                          : 'Este usuário está vinculado a mais de uma empresa — clique na empresa desejada, na lista, para editar o papel dela.'}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -372,8 +516,12 @@ export function Usuarios() {
                 <button type="button" className="botao botao-fantasma" onClick={() => setModalAberto(false)}>
                   Cancelar
                 </button>
-                <button type="submit" className="botao botao-primario" disabled={criar.isPending || atualizar.isPending}>
-                  {criar.isPending || atualizar.isPending ? 'Salvando…' : 'Salvar'}
+                <button
+                  type="submit"
+                  className="botao botao-primario"
+                  disabled={criar.isPending || atualizar.isPending || atualizarVinculo.isPending}
+                >
+                  {criar.isPending || atualizar.isPending || atualizarVinculo.isPending ? 'Salvando…' : 'Salvar'}
                 </button>
               </div>
             </form>
@@ -400,7 +548,10 @@ export function Usuarios() {
                     id="campo-empresa-vinculo"
                     value={empresaEscolhida}
                     disabled={!!vinculoEmEdicao}
-                    onChange={(e) => setEmpresaEscolhida(e.target.value)}
+                    onChange={(e) => {
+                      setEmpresaEscolhida(e.target.value);
+                      setInvestidorEscolhido('');
+                    }}
                   >
                     <option value="">Selecione…</option>
                     {empresasDisponiveisParaVinculo.map((empresa) => (
@@ -415,7 +566,10 @@ export function Usuarios() {
                   <select
                     id="campo-papel-vinculo"
                     value={papelEscolhido}
-                    onChange={(e) => setPapelEscolhido(e.target.value as Papel)}
+                    onChange={(e) => {
+                      setPapelEscolhido(e.target.value as Papel);
+                      setInvestidorEscolhido('');
+                    }}
                   >
                     {PAPEIS.map((p) => (
                       <option key={p.valor} value={p.valor}>
@@ -424,6 +578,25 @@ export function Usuarios() {
                     ))}
                   </select>
                 </div>
+                {papelEscolhido === 'INVESTIDOR_VISUALIZADOR' && (
+                  <div className="campo" style={{ marginTop: 12 }}>
+                    <label htmlFor="campo-investidor-vinculo">Investidor</label>
+                    <select
+                      id="campo-investidor-vinculo"
+                      value={investidorEscolhido}
+                      disabled={!empresaEscolhida}
+                      onChange={(e) => setInvestidorEscolhido(e.target.value)}
+                    >
+                      <option value="">Selecione…</option>
+                      {(investidoresDaEmpresaEscolhida ?? []).map((investidor) => (
+                        <option key={investidor.id} value={investidor.id}>
+                          {investidor.nome}
+                        </option>
+                      ))}
+                    </select>
+                    {!empresaEscolhida && <div className="dica">Selecione a empresa primeiro.</div>}
+                  </div>
+                )}
               </div>
               <div className="modal-rodape">
                 <button type="button" className="botao botao-fantasma" onClick={() => setModalVinculo(null)}>
