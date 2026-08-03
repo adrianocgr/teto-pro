@@ -94,6 +94,17 @@ public class DespesaRecorrente extends EntidadeComTenant {
     @Column(name = "dr_ultimo_valor", precision = 14, scale = 2)
     private BigDecimal ultimoValor;
 
+    /**
+     * Quando ativado, o job noturno ({@code LancamentoAutomaticoDespesaRecorrenteJob})
+     * cria sozinho a {@link Despesa} da competência corrente a partir deste
+     * modelo, usando {@code valorPadrao} e o rateio percentual dos
+     * {@code pagadores} — por isso exige {@code valorPadrao} preenchido (ver
+     * validação em {@code DespesaRecorrenteServico}).
+     */
+    @Column(name = "dr_lancamento_automatico", nullable = false)
+    @Builder.Default
+    private boolean lancamentoAutomatico = false;
+
     @CreationTimestamp
     @Column(name = "dr_created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

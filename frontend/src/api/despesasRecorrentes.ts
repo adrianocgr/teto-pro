@@ -26,6 +26,7 @@ export interface DespesaRecorrenteResposta {
   valorPadrao: number | null;
   diaVencimento: number | null;
   status: StatusAtivoInativo;
+  lancamentoAutomatico: boolean;
   pagadores: PagadorRecorrenteResposta[];
   ultimaCompetencia: string | null;
   ultimoValor: number | null;
@@ -38,6 +39,7 @@ export interface DespesaRecorrenteRequisicao {
   observacao: string | null;
   valorPadrao: number | null;
   diaVencimento: number | null;
+  lancamentoAutomatico: boolean;
   pagadores: PagadorRecorrenteRequisicao[];
 }
 

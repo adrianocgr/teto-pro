@@ -46,6 +46,10 @@ tetopro-obra:
     bucket: tetoproobra_arquivos
     tamanho-maximo-bytes: 15728640 # 15MB
     tipos-permitidos: application/pdf,image/jpeg,image/png
+  despesas-recorrentes:
+    lancamento-automatico:
+      # Todo dia às 23h (horário de São Paulo) — ver LancamentoAutomaticoDespesaRecorrenteJob.
+      cron: "0 0 23 * * *"
 
 springdoc:
   swagger-ui:

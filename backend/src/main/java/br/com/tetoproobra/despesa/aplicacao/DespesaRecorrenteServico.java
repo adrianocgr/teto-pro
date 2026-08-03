@@ -55,6 +55,7 @@ public class DespesaRecorrenteServico {
         Empreendimento empreendimento = buscarEmpreendimento(empreendimentoId);
         Categoria categoria = buscarCategoria(requisicao.categoriaId());
         Fornecedor fornecedor = resolverFornecedor(requisicao.fornecedorId());
+        validarLancamentoAutomatico(requisicao);
 
         DespesaRecorrente recorrente = DespesaRecorrente.builder()
                 .empreendimento(empreendimento)
@@ -65,6 +66,7 @@ public class DespesaRecorrenteServico {
                 .valorPadrao(requisicao.valorPadrao())
                 .diaVencimento(requisicao.diaVencimento())
                 .status(StatusAtivoInativo.ATIVO)
+                .lancamentoAutomatico(requisicao.lancamentoAutomatico())
                 .build();
 
         List<PagadorRecorrente> pagadores = montarPagadores(recorrente, requisicao.pagadores());
@@ -77,6 +79,7 @@ public class DespesaRecorrenteServico {
         DespesaRecorrente recorrente = buscarEntidadePorId(empreendimentoId, id);
         Categoria categoria = buscarCategoria(requisicao.categoriaId());
         Fornecedor fornecedor = resolverFornecedor(requisicao.fornecedorId());
+        validarLancamentoAutomatico(requisicao);
 
         recorrente.setCategoria(categoria);
         recorrente.setFornecedor(fornecedor);
@@ -84,6 +87,7 @@ public class DespesaRecorrenteServico {
         recorrente.setObservacao(requisicao.observacao());
         recorrente.setValorPadrao(requisicao.valorPadrao());
         recorrente.setDiaVencimento(requisicao.diaVencimento());
+        recorrente.setLancamentoAutomatico(requisicao.lancamentoAutomatico());
 
         // Mesmo cuidado de DespesaServico.atualizar: com orphanRemoval, um INSERT
         // pro MESMO investidor aconteceria antes do DELETE do antigo na mesma
@@ -111,6 +115,22 @@ public class DespesaRecorrenteServico {
 
     public void excluir(Long empreendimentoId, Long id) {
         repository.delete(buscarEntidadePorId(empreendimentoId, id));
+    }
+
+    /**
+     * O job noturno de lançamento automático usa {@code valorPadrao} como o
+     * valor total da despesa gerada (não há como perguntar "quanto foi a
+     * conta este mês" sem um usuário) — por isso exige o valor preenchido e
+     * positivo quando esta opção está ligada.
+     */
+    private void validarLancamentoAutomatico(DespesaRecorrenteRequisicao requisicao) {
+        if (!requisicao.lancamentoAutomatico()) {
+            return;
+        }
+        if (requisicao.valorPadrao() == null || requisicao.valorPadrao().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RegraDeNegocioException(
+                    "Informe um valor padrão maior que zero para habilitar o lançamento automático");
+        }
     }
 
     private List<PagadorRecorrente> montarPagadores(DespesaRecorrente recorrente, List<PagadorRecorrenteRequisicao> requisicoes) {

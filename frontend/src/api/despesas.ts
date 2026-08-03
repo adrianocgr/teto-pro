@@ -85,15 +85,40 @@ export interface DespesaRequisicao {
   dataPagamento?: string | null;
 }
 
+/**
+ * `page`/`size`/`sort` seguem a convenção do Spring Data usada em outras
+ * listagens paginadas (ver `Auditoria.tsx`) — `sort` no formato
+ * `"campo,asc"`/`"campo,desc"`. Quando omitido, o backend ordena por
+ * `dataPagamento` decrescente por padrão.
+ */
 export interface FiltrosDespesas {
+  busca?: string;
   categoriaId?: number;
   investidorId?: number;
-  busca?: string;
+  dataCadastroDe?: string;
+  dataCadastroAte?: string;
+  dataPagamentoDe?: string;
+  dataPagamentoAte?: string;
+  page?: number;
+  size?: number;
+  sort?: string;
 }
 
-async function listarDespesas(empreendimentoId: number, busca?: string): Promise<Pagina<DespesaResposta>> {
+async function listarDespesas(empreendimentoId: number, filtros: FiltrosDespesas = {}): Promise<Pagina<DespesaResposta>> {
   const resposta = await cliente.get<Pagina<DespesaResposta>>('/despesas', {
-    params: { empreendimentoId, busca: busca || undefined, size: 200 },
+    params: {
+      empreendimentoId,
+      busca: filtros.busca || undefined,
+      categoriaId: filtros.categoriaId,
+      investidorId: filtros.investidorId,
+      dataCadastroDe: filtros.dataCadastroDe || undefined,
+      dataCadastroAte: filtros.dataCadastroAte || undefined,
+      dataPagamentoDe: filtros.dataPagamentoDe || undefined,
+      dataPagamentoAte: filtros.dataPagamentoAte || undefined,
+      page: filtros.page ?? 0,
+      size: filtros.size ?? 200,
+      sort: filtros.sort || undefined,
+    },
   });
   return resposta.data;
 }
@@ -193,11 +218,10 @@ export async function importarNfe(arquivo: File): Promise<ImportacaoNfeResposta>
   return resposta.data;
 }
 
-export function useListaDespesas(empreendimentoId: number | undefined, filtros?: FiltrosDespesas) {
-  const busca = filtros?.busca ?? '';
+export function useListaDespesas(empreendimentoId: number | undefined, filtros: FiltrosDespesas = {}) {
   return useQuery({
-    queryKey: ['despesas', empreendimentoId, busca],
-    queryFn: () => listarDespesas(empreendimentoId as number, busca),
+    queryKey: ['despesas', empreendimentoId, filtros],
+    queryFn: () => listarDespesas(empreendimentoId as number, filtros),
     enabled: !!empreendimentoId,
   });
 }

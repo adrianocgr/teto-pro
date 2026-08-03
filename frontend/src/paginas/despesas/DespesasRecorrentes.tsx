@@ -30,6 +30,7 @@ interface Rascunho {
   observacao: string;
   valorPadrao: string;
   diaVencimento: string;
+  lancamentoAutomatico: boolean;
   pagadores: PagadorRascunho[];
 }
 
@@ -40,7 +41,16 @@ function novaChave(): string {
 }
 
 function rascunhoVazio(): Rascunho {
-  return { categoriaId: '', fornecedorId: '', descricao: '', observacao: '', valorPadrao: '', diaVencimento: '', pagadores: [] };
+  return {
+    categoriaId: '',
+    fornecedorId: '',
+    descricao: '',
+    observacao: '',
+    valorPadrao: '',
+    diaVencimento: '',
+    lancamentoAutomatico: false,
+    pagadores: [],
+  };
 }
 
 function paraRascunho(recorrente: DespesaRecorrenteResposta): Rascunho {
@@ -51,6 +61,7 @@ function paraRascunho(recorrente: DespesaRecorrenteResposta): Rascunho {
     observacao: recorrente.observacao ?? '',
     valorPadrao: recorrente.valorPadrao !== null ? String(recorrente.valorPadrao) : '',
     diaVencimento: recorrente.diaVencimento !== null ? String(recorrente.diaVencimento) : '',
+    lancamentoAutomatico: recorrente.lancamentoAutomatico,
     pagadores: recorrente.pagadores.map((p) => ({
       chave: novaChave(),
       investidorId: String(p.investidorId),
@@ -130,12 +141,14 @@ export function DespesasRecorrentes() {
 
   const somaPercentuais = rascunho.pagadores.reduce((soma, p) => soma + (Number(p.percentual) || 0), 0);
   const somaBate = Math.abs(somaPercentuais - 100) < 0.005;
+  const exigeValorPadrao = !rascunho.lancamentoAutomatico || (rascunho.valorPadrao ? Number(rascunho.valorPadrao) > 0 : false);
   const formularioValido =
     !!rascunho.categoriaId &&
     rascunho.descricao.trim().length > 0 &&
     rascunho.pagadores.length > 0 &&
     rascunho.pagadores.every((p) => !!p.investidorId && Number(p.percentual) > 0) &&
-    somaBate;
+    somaBate &&
+    exigeValorPadrao;
 
   function aoSalvar(evento: FormEvent) {
     evento.preventDefault();
@@ -147,6 +160,7 @@ export function DespesasRecorrentes() {
       observacao: rascunho.observacao.trim() || null,
       valorPadrao: rascunho.valorPadrao ? Number(rascunho.valorPadrao) : null,
       diaVencimento: rascunho.diaVencimento ? Number(rascunho.diaVencimento) : null,
+      lancamentoAutomatico: rascunho.lancamentoAutomatico,
       pagadores: rascunho.pagadores.map((p) => ({ investidorId: Number(p.investidorId), percentual: Number(p.percentual) })),
     };
 
@@ -256,6 +270,7 @@ export function DespesasRecorrentes() {
                       <th className="num">Valor padrão</th>
                       <th>Último lançamento</th>
                       <th>Status</th>
+                      <th>Lançamento automático</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -277,6 +292,14 @@ export function DespesasRecorrentes() {
                           <span className={`pilula-status ${recorrente.status === 'ATIVO' ? 'status-ativo' : 'status-inativo'}`}>
                             <span className="ponto" />
                             {recorrente.status}
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            className={`pilula-status ${recorrente.lancamentoAutomatico ? 'status-ativo' : 'status-inativo'}`}
+                          >
+                            <span className="ponto" />
+                            {recorrente.lancamentoAutomatico ? 'Ativado' : 'Desativado'}
                           </span>
                         </td>
                         <td style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -385,6 +408,23 @@ export function DespesasRecorrentes() {
                       value={rascunho.observacao}
                       onChange={(e) => setRascunho((r) => ({ ...r, observacao: e.target.value }))}
                     />
+                  </div>
+                  <div className="col-2">
+                    <label className="opcao-destaque" htmlFor="campo-lancamento-automatico">
+                      <input
+                        id="campo-lancamento-automatico"
+                        type="checkbox"
+                        checked={rascunho.lancamentoAutomatico}
+                        onChange={(e) => setRascunho((r) => ({ ...r, lancamentoAutomatico: e.target.checked }))}
+                      />
+                      <div className="opcao-texto">
+                        <span className="opcao-titulo">Lançamento automático</span>
+                        <span className="opcao-descricao">
+                          Todo dia à noite, o sistema lança sozinho a despesa deste mês usando o valor padrão e o
+                          rateio informado abaixo — exige valor padrão preenchido.
+                        </span>
+                      </div>
+                    </label>
                   </div>
                 </div>
 

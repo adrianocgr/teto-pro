@@ -7,6 +7,7 @@ import br.com.tetoproobra.despesa.infraestrutura.ArmazenamentoArquivoServico;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -14,6 +15,7 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.gridfs.GridFsResource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -47,8 +49,15 @@ public class DespesaController {
     public Page<DespesaResposta> listar(
             @RequestParam Long empreendimentoId,
             @RequestParam(required = false) String busca,
+            @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) Long investidorId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataCadastroDe,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataCadastroAte,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataPagamentoDe,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataPagamentoAte,
             @ParameterObject Pageable pageable) {
-        return servico.listar(empreendimentoId, busca, pageable);
+        return servico.listar(empreendimentoId, busca, categoriaId, investidorId,
+                dataCadastroDe, dataCadastroAte, dataPagamentoDe, dataPagamentoAte, pageable);
     }
 
     @GetMapping("/{id}")

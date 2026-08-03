@@ -6,17 +6,20 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface DespesaRepository extends JpaRepository<Despesa, Long> {
+/**
+ * {@link JpaSpecificationExecutor} habilita a combinação dinâmica de filtros
+ * opcionais (busca textual + períodos de lançamento/pagamento) na listagem —
+ * ver {@link DespesaEspecificacoes} e {@code DespesaServico#listar}.
+ */
+public interface DespesaRepository extends JpaRepository<Despesa, Long>, JpaSpecificationExecutor<Despesa> {
 
     Page<Despesa> findByEmpreendimentoId(Long empreendimentoId, Pageable pageable);
 
     boolean existsByRecorrencia_IdAndCompetencia(Long recorrenciaId, LocalDate competencia);
-
-    Page<Despesa> findByEmpreendimentoIdAndDescricaoContainingIgnoreCase(
-            Long empreendimentoId, String descricao, Pageable pageable);
 
     /**
      * Todas as despesas em que o investidor aparece como pagador (rateio) —

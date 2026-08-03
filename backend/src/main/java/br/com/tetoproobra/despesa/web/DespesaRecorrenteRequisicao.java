@@ -23,6 +23,9 @@ public record DespesaRecorrenteRequisicao(
 
         Integer diaVencimento,
 
+        /** Se {@code true}, exige {@code valorPadrao} preenchido — ver {@code DespesaRecorrenteServico}. */
+        boolean lancamentoAutomatico,
+
         @Valid
         List<PagadorRecorrenteRequisicao> pagadores
 ) {

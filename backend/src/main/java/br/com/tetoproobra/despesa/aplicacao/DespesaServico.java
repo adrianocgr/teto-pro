@@ -12,6 +12,7 @@ import br.com.tetoproobra.despesa.dominio.ItemDespesa;
 import br.com.tetoproobra.despesa.dominio.PagadorDespesa;
 import br.com.tetoproobra.despesa.infraestrutura.ArmazenamentoArquivoServico;
 import br.com.tetoproobra.despesa.infraestrutura.DespesaDocumentoRepository;
+import br.com.tetoproobra.despesa.infraestrutura.DespesaEspecificacoes;
 import br.com.tetoproobra.despesa.infraestrutura.DespesaRecorrenteRepository;
 import br.com.tetoproobra.despesa.infraestrutura.DespesaRepository;
 import br.com.tetoproobra.despesa.web.DespesaMapper;
@@ -39,10 +40,12 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -79,14 +82,63 @@ public class DespesaServico {
     private final ApplicationEventPublisher publicadorDeEventos;
     private final DespesaMapper mapper;
 
+    /**
+     * {@code busca} filtra pela descrição (contém, sem diferenciar maiúsculas);
+     * {@code categoriaId}/{@code investidorId} são filtros exatos opcionais;
+     * os quatro parâmetros de data são opcionais e independentes entre si —
+     * período de lançamento ({@code dataCadastro}) e período de pagamento
+     * ({@code dataPagamento}) podem vir só com "de", só com "até" ou com os
+     * dois. Todos combinados via {@link Specification}, para que a paginação
+     * e a ordenação do backend reflitam o total realmente filtrado (em vez de
+     * filtrar só a página já carregada, que seria incorreto com paginação de
+     * verdade). Quando a requisição não pede uma ordenação explícita, a lista
+     * volta ordenada por {@code dataPagamento} decrescente (ver
+     * {@link #aplicarOrdenacaoPadrao}).
+     */
     @Transactional(readOnly = true)
-    public Page<DespesaResposta> listar(Long empreendimentoId, String busca, Pageable pageable) {
-        Page<Despesa> pagina = StringUtils.hasText(busca)
-                ? despesaRepository.findByEmpreendimentoIdAndDescricaoContainingIgnoreCase(
-                        empreendimentoId, busca, pageable)
-                : despesaRepository.findByEmpreendimentoId(empreendimentoId, pageable);
+    public Page<DespesaResposta> listar(Long empreendimentoId, String busca, Long categoriaId, Long investidorId,
+            LocalDate dataCadastroDe, LocalDate dataCadastroAte,
+            LocalDate dataPagamentoDe, LocalDate dataPagamentoAte, Pageable pageable) {
+
+        if (dataCadastroDe != null && dataCadastroAte != null && dataCadastroDe.isAfter(dataCadastroAte)) {
+            throw new RegraDeNegocioException(
+                    "O período de lançamento é inválido: a data inicial não pode ser depois da final");
+        }
+        if (dataPagamentoDe != null && dataPagamentoAte != null && dataPagamentoDe.isAfter(dataPagamentoAte)) {
+            throw new RegraDeNegocioException(
+                    "O período de pagamento é inválido: a data inicial não pode ser depois da final");
+        }
+
+        Specification<Despesa> especificacao = Specification
+                .where(DespesaEspecificacoes.comEmpreendimento(empreendimentoId))
+                .and(DespesaEspecificacoes.comDescricaoContendo(busca))
+                .and(DespesaEspecificacoes.comCategoria(categoriaId))
+                .and(DespesaEspecificacoes.comInvestidorPagador(investidorId))
+                .and(DespesaEspecificacoes.comDataCadastroEntre(dataCadastroDe, dataCadastroAte))
+                .and(DespesaEspecificacoes.comDataPagamentoEntre(dataPagamentoDe, dataPagamentoAte));
+
+        Page<Despesa> pagina = despesaRepository.findAll(especificacao, aplicarOrdenacaoPadrao(pageable));
 
         return pagina.map(mapper::paraResposta);
+    }
+
+    /**
+     * Sem {@code sort} explícito na requisição, a ordem default é por data de
+     * pagamento, da mais recente para a mais antiga. Em qualquer ordenação por
+     * {@code dataPagamento} — a default ou uma escolhida pelo usuário — as
+     * despesas ainda não pagas (campo nulo) sempre vão para o fim da lista,
+     * independentemente da direção: sem isso, o Postgres despeja os nulos no
+     * TOPO quando a ordem é decrescente (nulo é "maior" que qualquer data),
+     * escondendo atrás deles as despesas realmente pagas mais recentemente.
+     */
+    private Pageable aplicarOrdenacaoPadrao(Pageable pageable) {
+        Sort sort = pageable.getSort().isSorted() ? pageable.getSort() : Sort.by(Sort.Direction.DESC, "dataPagamento");
+
+        List<Sort.Order> ordens = sort.stream()
+                .map(ordem -> "dataPagamento".equals(ordem.getProperty()) ? ordem.nullsLast() : ordem)
+                .toList();
+
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(ordens));
     }
 
     @Transactional(readOnly = true)
@@ -95,6 +147,21 @@ public class DespesaServico {
     }
 
     public DespesaResposta criar(DespesaRequisicao requisicao) {
+        return criar(requisicao, usuarioContextoServico.obterUsuarioAutenticado());
+    }
+
+    /**
+     * Mesma criação de {@link #criar(DespesaRequisicao)}, mas recebendo o
+     * usuário responsável explicitamente em vez de resolvê-lo do
+     * {@code SecurityContextHolder} — usado pelo
+     * {@code LancamentoAutomaticoDespesaRecorrenteJob}, que roda numa thread
+     * do agendador, sem requisição HTTP/JWT autenticado.
+     */
+    public DespesaResposta criarAutomatica(DespesaRequisicao requisicao, Usuario usuarioResponsavel) {
+        return criar(requisicao, usuarioResponsavel);
+    }
+
+    private DespesaResposta criar(DespesaRequisicao requisicao, Usuario usuarioAtual) {
         Empreendimento empreendimento = buscarEmpreendimento(requisicao.empreendimentoId());
         Categoria categoria = buscarCategoria(requisicao.categoriaId());
         Fornecedor fornecedor = resolverFornecedor(requisicao.fornecedorId());
@@ -119,7 +186,6 @@ public class DespesaServico {
         validarRateio(pagadores, valorTotal);
         despesa.getPagadores().addAll(pagadores);
 
-        Usuario usuarioAtual = usuarioContextoServico.obterUsuarioAutenticado();
         despesa.setUsuarioCadastro(usuarioAtual);
 
         DespesaRecorrente recorrencia = resolverOrigemRecorrente(empreendimento, requisicao);

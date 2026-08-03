@@ -17,6 +17,7 @@ public record DespesaRecorrenteResposta(
         BigDecimal valorPadrao,
         Integer diaVencimento,
         StatusAtivoInativo status,
+        boolean lancamentoAutomatico,
         List<PagadorRecorrenteResposta> pagadores,
         LocalDate ultimaCompetencia,
         BigDecimal ultimoValor
